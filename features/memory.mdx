@@ -212,29 +212,20 @@ This means agtOS works on a fresh install with no Redis and no Ollama. As you ad
 # Redis URL (required for episodic and semantic memory)
 REDIS_URL=redis://localhost:6379
 
-# Episodic memory TTL (seconds, default 30 days)
-AGTOS_MEMORY_EPISODE_TTL=2592000
-
-# Embedding provider for semantic memory
-AGTOS_EMBEDDING_PROVIDER=ollama
-AGTOS_EMBEDDING_MODEL=nomic-embed-text
-
-# Ollama URL (for local embeddings)
-OLLAMA_URL=http://localhost:11434
+# Ollama (provides embeddings for semantic memory)
+OLLAMA_HOST=http://localhost:11434
 ```
 
 <Accordion title="Working memory configuration">
-Working memory settings control how conversation history is managed within a session:
+Working memory settings are configured via code (`WorkingMemoryConfig`), not environment variables. The defaults work well for most deployments:
 
-```bash
-# Maximum conversation turns before summarization kicks in
-AGTOS_WORKING_MEMORY_MAX_TURNS=20
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `maxHistoryTokens` | `4000` | Max tokens before summarization triggers |
+| `maxMessages` | `30` | Max messages before summarization regardless of token count |
+| `preserveRecentCount` | `6` | Recent messages preserved verbatim during summarization |
 
-# Token budget for the summary of older turns
-AGTOS_WORKING_MEMORY_SUMMARY_TOKENS=500
-```
-
-When conversation length exceeds `max_turns`, older turns are summarized by the LLM into a condensed context, keeping the working memory focused and within token limits.
+When conversation length exceeds these limits, older turns are summarized by the LLM into a condensed context, keeping the working memory focused and within token limits.
 </Accordion>
 
 ## Privacy and Data Control

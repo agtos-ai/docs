@@ -91,25 +91,7 @@ The MCP client connects agtOS to external MCP servers, discovering their tools a
 
 ### Configuration
 
-```bash
-# In .env.local or environment
-AGTOS_MCP_SERVERS='[
-  {
-    "name": "home",
-    "url": "http://localhost:5000/mcp",
-    "prefix": "home",
-    "autoReconnect": true,
-    "reconnectInterval": 30000
-  },
-  {
-    "name": "files",
-    "url": "http://localhost:5001/mcp",
-    "prefix": "fs"
-  }
-]'
-```
-
-Or in the orchestrator configuration:
+External MCP servers are configured in the orchestrator initialization:
 
 ```typescript
 const orchestrator = new VoicePipelineOrchestrator({
@@ -221,15 +203,13 @@ Claude Desktop                    agtOS                     Smart Home MCP Serve
 # MCP Server
 MCP_PORT=4100                      # Server port (default: 4100)
 
-# MCP Client - external server connections
-AGTOS_MCP_SERVERS='[...]'          # JSON array of server configs
-
-# Dynamic tool selection
-AGTOS_TOOL_SELECTION_TOP_K=8       # Max tools per request (default: 8)
-AGTOS_TOOL_SELECTION_THRESHOLD=0.7 # Min similarity score (default: 0.7)
-
-# Embedding provider (shared with semantic memory)
-AGTOS_EMBEDDING_PROVIDER=ollama
-AGTOS_EMBEDDING_MODEL=nomic-embed-text
-OLLAMA_URL=http://localhost:11434
+# Ollama (used for intent classification and embeddings)
+OLLAMA_HOST=http://localhost:11434
 ```
+
+Tool selection and embedding configuration are set via code config objects (`ToolSelectionConfig`, `SemanticMemoryConfig`) rather than environment variables. The defaults work well for most deployments:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `maxTools` | `8` | Max tools included per request (ADR-009) |
+| `includeMetaTools` | `true` | Include `discover_tools` meta-tool |
