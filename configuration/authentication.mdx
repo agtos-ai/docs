@@ -1,0 +1,63 @@
+---
+title: "Authentication"
+description: "Configure Claude API access — standard key or Max subscription"
+---
+
+agtOS supports two authentication methods for Claude. Both can coexist — the system auto-detects the token format.
+
+## Option A: Standard API Key
+
+Pay-per-token billing from [console.anthropic.com](https://console.anthropic.com).
+
+```bash
+# .env.local
+ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
+```
+
+- Token prefix: `sk-ant-api03-`
+- Sent via `X-Api-Key` HTTP header
+- Direct SDK connection to `api.anthropic.com`
+
+## Option B: Max/Pro Subscription
+
+Flat monthly rate using your Claude subscription via the `claude` CLI.
+
+```bash
+# Generate token
+claude setup-token
+
+# .env.local
+ANTHROPIC_AUTH_TOKEN=sk-ant-oat01-your-token-here
+```
+
+- Token prefix: `sk-ant-oat01-`
+- agtOS spawns the `claude` CLI as a subprocess
+- No external proxy needed — the CLI handles OAuth
+
+<Note>
+The `claude` CLI must be installed and on your PATH. Install from [claude.ai/download](https://claude.ai/download).
+</Note>
+
+## Auto-Detection
+
+agtOS checks env vars in this priority order:
+1. `ANTHROPIC_AUTH_TOKEN` / `CLAUDE_CODE_OAUTH_TOKEN` → CLI transport
+2. `ANTHROPIC_API_KEY` / `CLAUDE_API_KEY` → SDK transport
+
+The token prefix determines the auth method:
+- `sk-ant-oat` → Bearer auth (CLI subprocess)
+- `sk-ant-api` → API key auth (direct SDK)
+
+## Advanced Options
+
+```bash
+# Adaptive thinking (recommended for Claude 4.6)
+CLAUDE_THINKING=adaptive
+CLAUDE_EFFORT=medium      # low, medium, high, max
+
+# Service tier
+CLAUDE_SERVICE_TIER=auto  # auto or standard_only
+
+# Custom API endpoint (for proxies)
+ANTHROPIC_BASE_URL=http://localhost:8317
+```

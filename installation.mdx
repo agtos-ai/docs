@@ -1,0 +1,49 @@
+---
+title: "Installation"
+description: "Detailed installation guide for all platforms"
+---
+
+## Requirements
+
+| Component | Version | Required |
+|-----------|---------|----------|
+| Node.js | 22+ | Yes |
+| Docker | Latest | For voice (STT/TTS) |
+| Redis | 7.2+ | For memory, scheduling |
+| Ollama | Latest | For local AI models |
+
+## Install Methods
+
+### npm (Development)
+
+```bash
+git clone https://github.com/agtos-ai/agtos.git
+cd agtos
+npm install
+```
+
+### CLI (Global)
+
+```bash
+npm install -g agtos
+agtos setup    # Interactive configuration
+agtos start    # Start the server
+```
+
+### Docker
+
+```bash
+docker compose up -d
+```
+
+### Desktop App
+
+Download from [GitHub Releases](https://github.com/agtos-ai/agtos/releases).
+
+## Ports
+
+| Port | Service |
+|------|---------|
+| 3000 | Voice WebSocket |
+| 4100 | MCP Server |
+| 4102 | Health + API + Dashboard |

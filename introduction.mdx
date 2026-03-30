@@ -1,0 +1,57 @@
+---
+title: "Introduction"
+description: "agtOS — Voice-native AI agent platform"
+---
+
+# What is agtOS?
+
+agtOS is an open-source, voice-native AI agent platform. It provides the infrastructure layer for AI agents that can hear, speak, think, and act — connecting voice input/output with LLM reasoning and tool execution.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Voice Pipeline" icon="microphone">
+    STT → LLM → TTS cascade with WebSocket streaming, word timestamps, and barge-in support
+  </Card>
+  <Card title="Multi-Provider AI" icon="brain">
+    Claude (API key + Max subscription), Ollama (local), model routing with automatic fallback
+  </Card>
+  <Card title="MCP Integration" icon="plug">
+    9 built-in MCP tools + external MCP server connections for extensibility
+  </Card>
+  <Card title="Memory System" icon="database">
+    Three-tier: working (per-session), episodic (Redis), semantic (vector search)
+  </Card>
+  <Card title="Desktop App" icon="desktop">
+    Tauri 2 native shell with system tray, global hotkey, auto-update
+  </Card>
+  <Card title="Task Scheduling" icon="clock">
+    Redis-backed cron, once, and interval task execution
+  </Card>
+</CardGroup>
+
+## Architecture
+
+agtOS uses a dual-layer architecture:
+
+- **Infrastructure Layer**: Voice pipeline, audio processing, WebSocket transport
+- **Orchestration Layer**: AI-driven via protocol gateway (MCP + A2A ready)
+
+```
+User Voice → STT (speaches) → Model Router → Claude/Ollama → TTS → Speaker
+                                    ↓
+                              Agent Loop → Tool Registry → MCP Tools
+                                    ↓
+                           Memory (Working + Episodic + Semantic)
+```
+
+## Getting Started
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get running in 5 minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed setup guide
+  </Card>
+</CardGroup>
