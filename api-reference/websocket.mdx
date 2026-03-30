@@ -1,8 +1,394 @@
 ---
-title: "websocket"
-description: "Documentation for websocket"
+title: "WebSocket Voice Protocol"
+description: "Real-time bidirectional audio streaming protocol for voice interaction with agtOS"
 ---
 
-# websocket
+The agtOS voice pipeline uses raw WebSocket for bidirectional audio streaming between the server and clients (ESP32 devices, browsers). This avoids the STUN/TURN/ICE complexity of WebRTC while working reliably on local networks.
 
-<Info>This page is being written. Check back soon or contribute at [github.com/agtos-ai/docs](https://github.com/agtos-ai/docs).</Info>
+**Connection URL**: `ws://<host>:<VOICE_PORT>/audio`
+
+Default: `ws://localhost:3000/audio`
+
+## Audio Format
+
+All audio data is transmitted as raw PCM in binary WebSocket frames.
+
+| Property    | Value                |
+|-------------|----------------------|
+| Encoding    | PCM (signed integer) |
+| Bit Depth   | 16-bit (Int16)       |
+| Sample Rate | 16,000 Hz            |
+| Channels    | 1 (mono)             |
+| Byte Order  | Little-endian        |
+| Max Frame   | 1 MB                 |
+
+Both client-to-server (microphone audio) and server-to-client (TTS audio) use the same format.
+
+## Connection Lifecycle
+
+```
+Client                                Server
+  |                                      |
+  |  --- WebSocket CONNECT /audio --->   |
+  |                                      |  (assign clientId, sessionId)
+  |  <--- session_ack (JSON) ----------  |
+  |                                      |
+  |  --- session_start (JSON) -------->  |  (optional: set deviceId)
+  |                                      |
+  |  --- binary audio frames --------->  |  (microphone PCM data)
+  |  --- binary audio frames --------->  |
+  |                                      |  (STT processing)
+  |                                      |  (LLM reasoning)
+  |                                      |  (TTS synthesis)
+  |  <--- tts_start (JSON) ----------   |
+  |  <--- binary audio frames --------  |  (TTS PCM data)
+  |  <--- binary audio frames --------  |
+  |  <--- tts_end (JSON) ------------   |
+  |                                      |
+  |  --- session_end (JSON) --------->  |  (optional: end session)
+  |                                      |
+  |  --- WebSocket CLOSE ------------>  |
+  |                                      |
+```
+
+<Steps>
+  <Step title="Connect">
+    Client opens a WebSocket connection to `ws://<host>:<VOICE_PORT>/audio`.
+  </Step>
+  <Step title="Session Ack">
+    Server immediately sends a `session_ack` message with the assigned `sessionId` and audio configuration.
+  </Step>
+  <Step title="Session Start (optional)">
+    Client sends `session_start` with an optional `deviceId` to identify the hardware.
+  </Step>
+  <Step title="Audio Streaming">
+    Client sends binary frames containing raw PCM audio from the microphone. Server processes through the voice pipeline (VAD, STT, LLM, TTS).
+  </Step>
+  <Step title="TTS Playback">
+    Server sends `tts_start`, followed by binary PCM audio frames, followed by `tts_end`.
+  </Step>
+  <Step title="Session End (optional)">
+    Client sends `session_end` to signal end of conversation.
+  </Step>
+  <Step title="Disconnect">
+    Either side closes the WebSocket connection.
+  </Step>
+</Steps>
+
+## Client to Server Messages
+
+### Binary Frames: Audio Data
+
+Raw PCM audio from the client microphone. Must match the audio format specification (Int16, 16kHz, mono, little-endian).
+
+Send audio in chunks as they become available from the microphone. There is no required chunk size, but typical sizes are 320 bytes (10ms) to 3200 bytes (100ms).
+
+### Text Frames: Control Messages
+
+All control messages are JSON objects with a `type` field.
+
+<Accordion title="session_start">
+
+Sent after connection to identify the device and begin a voice session.
+
+```json
+{
+  "type": "session_start",
+  "deviceId": "esp32-kitchen-01"
+}
+```
+
+| Field      | Type   | Required | Description                              |
+|------------|--------|----------|------------------------------------------|
+| `type`     | string | Yes      | Must be `"session_start"`.               |
+| `deviceId` | string | No       | Device identifier for multi-device setups.|
+
+</Accordion>
+
+<Accordion title="session_end">
+
+Signal the end of a voice session. The WebSocket connection remains open.
+
+```json
+{
+  "type": "session_end"
+}
+```
+
+| Field  | Type   | Required | Description                |
+|--------|--------|----------|----------------------------|
+| `type` | string | Yes      | Must be `"session_end"`.   |
+
+</Accordion>
+
+<Accordion title="config">
+
+Update runtime configuration for this connection.
+
+```json
+{
+  "type": "config",
+  "config": {
+    "vadSensitivity": 0.8,
+    "language": "en"
+  }
+}
+```
+
+| Field    | Type   | Required | Description                       |
+|----------|--------|----------|-----------------------------------|
+| `type`   | string | Yes      | Must be `"config"`.               |
+| `config` | object | No       | Key-value configuration overrides.|
+
+</Accordion>
+
+<Accordion title="status">
+
+Request connection status from the server. Server responds with a `status` control message.
+
+```json
+{
+  "type": "status"
+}
+```
+
+</Accordion>
+
+## Server to Client Messages
+
+### Binary Frames: TTS Audio Data
+
+Raw PCM audio synthesized by the TTS engine. Same format as client audio: Int16, 16kHz, mono, little-endian. Sent between `tts_start` and `tts_end` control messages.
+
+### Text Frames: Control Messages
+
+<Accordion title="session_ack">
+
+Sent immediately after connection to confirm session assignment and audio configuration.
+
+```json
+{
+  "type": "session_ack",
+  "sessionId": "session-a1b2c3d4e5f6",
+  "details": {
+    "sampleRate": 16000,
+    "channels": 1,
+    "bitDepth": 16
+  }
+}
+```
+
+| Field              | Type   | Description                                |
+|--------------------|--------|--------------------------------------------|
+| `type`             | string | Always `"session_ack"`.                    |
+| `sessionId`        | string | Server-assigned session ID.                |
+| `details.sampleRate` | number | Expected audio sample rate (16000).      |
+| `details.channels` | number | Expected channel count (1).                |
+| `details.bitDepth` | number | Expected bit depth (16).                   |
+
+</Accordion>
+
+<Accordion title="tts_start">
+
+Indicates that TTS audio frames will follow. The client should prepare to play audio.
+
+```json
+{
+  "type": "tts_start",
+  "sessionId": "session-a1b2c3d4e5f6"
+}
+```
+
+</Accordion>
+
+<Accordion title="tts_end">
+
+Indicates that all TTS audio frames for the current utterance have been sent.
+
+```json
+{
+  "type": "tts_end",
+  "sessionId": "session-a1b2c3d4e5f6"
+}
+```
+
+</Accordion>
+
+<Accordion title="error">
+
+Sent when an error occurs during processing.
+
+```json
+{
+  "type": "error",
+  "sessionId": "session-a1b2c3d4e5f6",
+  "error": "STT processing failed: model unavailable"
+}
+```
+
+| Field       | Type   | Description                          |
+|-------------|--------|--------------------------------------|
+| `type`      | string | Always `"error"`.                    |
+| `sessionId` | string | Associated session (if available).   |
+| `error`     | string | Human-readable error description.    |
+
+</Accordion>
+
+<Accordion title="status">
+
+Response to a client `status` request. Contains connection metrics.
+
+```json
+{
+  "type": "status",
+  "sessionId": "session-a1b2c3d4e5f6",
+  "details": {
+    "connectedAt": 1711612800000,
+    "bytesReceived": 1048576,
+    "bytesSent": 524288,
+    "uptime": 60000
+  }
+}
+```
+
+| Field                  | Type   | Description                            |
+|------------------------|--------|----------------------------------------|
+| `details.connectedAt`  | number | Unix ms timestamp of connection start. |
+| `details.bytesReceived`| number | Total audio bytes received from client.|
+| `details.bytesSent`    | number | Total audio bytes sent to client.      |
+| `details.uptime`       | number | Connection duration in milliseconds.   |
+
+</Accordion>
+
+## Keepalive and Timeout
+
+The server sends WebSocket `ping` frames at a configurable interval (default: 30 seconds). Clients must respond with `pong` frames (this is handled automatically by most WebSocket libraries).
+
+If a client does not respond to a `ping` with a `pong` before the next ping cycle, the server considers the client unresponsive and terminates the connection.
+
+| Setting          | Default  | Description                                  |
+|------------------|----------|----------------------------------------------|
+| Ping interval    | 30,000ms | Time between keepalive pings.                |
+| Stale detection  | 2 cycles | Client terminated after missing one pong.    |
+
+## Connection Limits
+
+| Limit              | Value | Description                                          |
+|--------------------|-------|------------------------------------------------------|
+| Max clients        | 10    | Maximum simultaneous WebSocket connections.           |
+| Max frame size     | 1 MB  | Maximum size of a single WebSocket frame.             |
+
+<Warning>
+When the maximum client count is reached, new connections are rejected with WebSocket close code `1013` (Try Again Later) and the message "Max clients reached".
+</Warning>
+
+## Error Handling
+
+### Connection Rejection
+
+| Close Code | Reason                  | When                                  |
+|------------|-------------------------|---------------------------------------|
+| 1001       | Server shutting down    | Server is performing graceful shutdown.|
+| 1013       | Max clients reached     | Too many concurrent connections.      |
+
+### Runtime Errors
+
+Errors during audio processing (STT failure, LLM timeout, TTS error) are reported via `error` control messages. The WebSocket connection remains open so the client can retry.
+
+### Reconnection
+
+<Tip>
+Clients should implement reconnection with exponential backoff to handle transient disconnections gracefully.
+</Tip>
+
+<Steps>
+  <Step title="Initial Wait">
+    Wait 1 second after first disconnection.
+  </Step>
+  <Step title="Backoff">
+    Double the wait time on each subsequent attempt (2s, 4s, 8s...).
+  </Step>
+  <Step title="Cap">
+    Cap the maximum wait at 30 seconds.
+  </Step>
+  <Step title="Reset">
+    Reset the backoff timer after a successful connection.
+  </Step>
+</Steps>
+
+## Example: Browser Client
+
+```javascript
+const ws = new WebSocket('ws://localhost:3000/audio');
+
+ws.binaryType = 'arraybuffer';
+
+ws.onopen = () => {
+  // Send session start with device identification
+  ws.send(JSON.stringify({
+    type: 'session_start',
+    deviceId: 'browser-main'
+  }));
+};
+
+ws.onmessage = (event) => {
+  if (event.data instanceof ArrayBuffer) {
+    // Binary frame: TTS audio data (Int16 PCM, 16kHz, mono)
+    const pcmData = new Int16Array(event.data);
+    playAudio(pcmData);
+  } else {
+    // Text frame: control message
+    const msg = JSON.parse(event.data);
+    switch (msg.type) {
+      case 'session_ack':
+        console.log('Session:', msg.sessionId);
+        break;
+      case 'tts_start':
+        console.log('TTS playback starting');
+        break;
+      case 'tts_end':
+        console.log('TTS playback complete');
+        break;
+      case 'error':
+        console.error('Server error:', msg.error);
+        break;
+    }
+  }
+};
+
+// Stream microphone audio
+async function startMicrophone() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const context = new AudioContext({ sampleRate: 16000 });
+  const source = context.createMediaStreamSource(stream);
+  const processor = context.createScriptProcessor(4096, 1, 1);
+
+  source.connect(processor);
+  processor.connect(context.destination);
+
+  processor.onaudioprocess = (e) => {
+    const float32 = e.inputBuffer.getChannelData(0);
+    // Convert Float32 to Int16
+    const int16 = new Int16Array(float32.length);
+    for (let i = 0; i < float32.length; i++) {
+      int16[i] = Math.max(-32768, Math.min(32767, float32[i] * 32768));
+    }
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(int16.buffer);
+    }
+  };
+}
+```
+
+## Example: ESP32 Client
+
+For ESP32 firmware using the XIAO ESP32-S3 Sense, see the [firmware repository](https://github.com/agtos-ai/agtos-firmware). The ESP32 streams I2S microphone data (PDM, pins 42/41) as raw PCM over WebSocket and plays back TTS audio through an I2S DAC.
+
+<Note>
+Key considerations for ESP32:
+
+- Use binary WebSocket frames for audio data.
+- Buffer at least 100ms of audio before sending to reduce frame overhead.
+- Handle `ping`/`pong` keepalive (most ESP32 WebSocket libraries handle this automatically).
+- Implement reconnection with backoff for Wi-Fi instability.
+</Note>

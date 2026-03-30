@@ -1,8 +1,269 @@
 ---
-title: "providers"
-description: "Documentation for providers"
+title: "Provider Configuration"
+description: "Configure Claude, Ollama, speaches STT/TTS, and the model router"
 ---
 
-# providers
+agtOS uses a multi-provider architecture. Claude handles complex reasoning in the cloud, Ollama runs local models for fast responses and privacy, and speaches provides speech-to-text and text-to-speech. The model router ties them together, sending each request to the optimal provider.
 
-<Info>This page is being written. Check back soon or contribute at [github.com/agtos-ai/docs](https://github.com/agtos-ai/docs).</Info>
+## Claude Provider
+
+Claude is the primary cloud LLM for agtOS, used for complex conversations, multi-step reasoning, and background agentic tasks. agtOS integrates two Anthropic SDKs (see [ADR-003](/architecture/decisions#adr-003)):
+
+- **Client SDK** (`@anthropic-ai/sdk`) -- real-time voice path with streaming
+- **Agent SDK** (`@anthropic-ai/claude-agent-sdk`) -- background autonomous tasks
+
+### Model Selection
+
+| Model | ID | Best For | Input $/MTok | Output $/MTok |
+|---|---|---|---|---|
+| Claude Opus 4 | `claude-opus-4-20250514` | Complex reasoning, analysis | $15.00 | $75.00 |
+| Claude Sonnet 4 | `claude-sonnet-4-20250514` | Balanced performance (default) | $3.00 | $15.00 |
+| Claude Haiku 4.5 | `claude-haiku-4-5-20251001` | Speed, low cost, voice pipeline | $0.80 | $4.00 |
+
+Set the model via environment variable:
+
+```bash
+CLAUDE_MODEL=claude-sonnet-4-20250514
+```
+
+### Configuration Options
+
+```bash
+# .env.local
+
+# Model (defaults to Sonnet 4)
+CLAUDE_MODEL=claude-sonnet-4-20250514
+
+# Adaptive thinking — lets the model decide when to use extended reasoning
+# Values: adaptive (recommended), enabled (legacy), disabled
+CLAUDE_THINKING=adaptive
+
+# Effort level for adaptive thinking
+# Values: low, medium, high, max (max is Opus 4.6 only)
+CLAUDE_EFFORT=medium
+
+# Service tier — 'auto' uses priority capacity when available
+# Values: auto, standard_only
+CLAUDE_SERVICE_TIER=auto
+
+# Custom API base URL (for proxies or CLI transport)
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+```
+
+### Provider Defaults
+
+When no environment variables are set, the Claude provider uses these defaults:
+
+| Setting | Default | Notes |
+|---|---|---|
+| `model` | `claude-sonnet-4-20250514` | Sonnet 4 balances speed and capability |
+| `maxTokens` | `4096` | Max output tokens per response |
+| `temperature` | `0.7` | Generation temperature (0.0 - 1.0) |
+| `timeoutMs` | `300000` | 5-minute request timeout |
+| `promptCache.maxEntries` | `50` | LRU prompt cache size |
+
+### Dual-SDK Architecture
+
+The voice pipeline uses the Client SDK for real-time streaming, targeting first-token latency under 200ms and first-sentence latency under 500ms. Background tasks like "research the best options for X" are dispatched to the Agent SDK, which handles multi-step tool execution autonomously.
+
+Both SDKs connect to the same MCP servers, so tools are defined once and available to both paths. See [Authentication](/configuration/authentication) for API key setup.
+
+<Tip>
+For voice interactions, Haiku 4.5 provides the best speed-to-cost ratio. The model router (below) automatically selects Haiku for simple queries and Sonnet for complex ones.
+</Tip>
+
+## Ollama Provider
+
+Ollama serves local models for intent classification and handling simple queries without cloud API calls. This reduces cost, latency, and keeps privacy-sensitive requests on-device.
+
+### Configuration
+
+```bash
+# .env.local
+
+# Ollama server URL
+OLLAMA_HOST=http://localhost:11434
+
+# Default model for local query execution
+OLLAMA_DEFAULT_MODEL=qwen3:4b
+
+# Model for intent classification (small and fast)
+OLLAMA_INTENT_MODEL=qwen3:1.7b
+```
+
+### Intent Classifier
+
+The intent classifier is a small, fast model that categorizes every incoming request before it reaches an LLM. It runs on CPU in under 50ms and determines:
+
+| Category | Description | Route |
+|---|---|---|
+| `simple_query` | Factual queries, greetings, time/date | Local (Ollama) |
+| `system_command` | Volume, timer, reminder | Local (Ollama) |
+| `tool_use` | File ops, API calls | May need Claude |
+| `complex_reasoning` | Analysis, code review | Claude |
+| `creative` | Writing, brainstorming | Claude |
+
+### Classifier Defaults
+
+| Setting | Default | Notes |
+|---|---|---|
+| `host` | `http://localhost:11434` | Ollama API URL |
+| `model` | `qwen3:1.7b` | Small model for fast classification |
+| `confidenceThreshold` | `0.7` | Below this confidence, escalate to Claude |
+| `timeoutMs` | `2000` | Max classification time before defaulting to cloud |
+
+<Warning>
+Ollama has a confirmed bug where streaming + tools enabled simultaneously produces malformed output. agtOS automatically uses `stream: false` when tools are involved, which adds latency but produces correct results.
+</Warning>
+
+## speaches STT/TTS
+
+[speaches](https://github.com/speaches-ai/speaches) is a self-hosted server that provides OpenAI-compatible speech-to-text and text-to-speech endpoints. agtOS uses it for the cascade voice pipeline.
+
+### Configuration
+
+```bash
+# .env.local
+
+# speaches server URL (shared by STT and TTS)
+SPEACHES_URL=http://localhost:8000
+
+# --- Speech-to-Text ---
+STT_PROVIDER=speaches
+SPEACHES_STT_MODEL=Systran/faster-whisper-small
+
+# --- Text-to-Speech ---
+TTS_PROVIDER=speaches
+SPEACHES_TTS_MODEL=speaches-ai/Kokoro-82M-v1.0-ONNX
+SPEACHES_TTS_VOICE=af_heart
+```
+
+### STT Defaults
+
+| Setting | Default | Notes |
+|---|---|---|
+| `baseUrl` | `http://localhost:8000` | speaches API URL |
+| `model` | `Systran/faster-whisper-small` | Faster Whisper model |
+| `language` | `en` | Language code (en, es, fr, etc.) |
+| `timeoutMs` | `30000` | 30-second request timeout |
+
+### TTS Defaults
+
+| Setting | Default | Notes |
+|---|---|---|
+| `baseUrl` | `http://localhost:8000` | speaches API URL |
+| `model` | `speaches-ai/Kokoro-82M-v1.0-ONNX` | Kokoro ONNX model for fast synthesis |
+| `voice` | `af_heart` | Default voice ID |
+| `format` | `wav` | Output format (wav or mp3) |
+| `speed` | `1.0` | Speaking speed (0.25 - 4.0) |
+| `timeoutMs` | `30000` | 30-second request timeout |
+
+<Note>
+speaches does not support `opus` or `aac` audio formats. Use `wav` (default) or `mp3`.
+</Note>
+
+## Model Router
+
+The model router implements [ADR-004](/architecture/decisions#adr-004) -- a three-tier routing architecture that sends each request to the optimal inference tier.
+
+### How Routing Works
+
+```
+User Request
+     |
+     v
+Tier 1: Intent Classifier (<50ms, local)
+     |
+     +-- simple + tools ------> Tier 2: Ollama (stream: false)
+     +-- simple + no tools ----> Tier 2: Ollama (stream: true)
+     +-- complex --------------> Tier 3: Claude Haiku (streaming)
+     +-- very complex ---------> Tier 3: Claude Sonnet (streaming)
+     +-- privacy sensitive ----> Tier 2: Ollama (regardless of complexity)
+```
+
+### Router Configuration
+
+```bash
+# .env.local
+
+# Use the model router as the command provider (default)
+COMMAND_PROVIDER=model-router
+
+# Local model for Tier 2 execution
+OLLAMA_DEFAULT_MODEL=qwen3:4b
+
+# Cloud model for Tier 3 execution
+CLAUDE_MODEL=claude-sonnet-4-20250514
+```
+
+### Router Defaults
+
+| Setting | Default | Notes |
+|---|---|---|
+| `classificationEnabled` | `true` | Enable intent classification |
+| `defaultProvider` | `claude` | Fallback when classification is disabled |
+| `localModel` | `qwen3:4b` | Ollama model for local execution |
+| `cloudModel` | `claude-sonnet-4-20250514` | Claude model for cloud execution |
+| `privacyMode` | `false` | When true, never sends to cloud |
+| `maxCostPerRequest` | `0` | Cost limit in USD (0 = unlimited) |
+
+### Pattern Overrides
+
+The router supports regex patterns that force specific routing regardless of classification:
+
+<CodeGroup>
+```typescript Force Cloud Patterns
+// Always route to Claude:
+'analyze.*code'
+'review.*pull.?request'
+'refactor'
+'debug'
+'write.*test'
+'explain.*architecture'
+```
+
+```typescript Force Local Patterns
+// Always route to Ollama:
+'^(hi|hello|hey|good\\s+(morning|afternoon|evening))'
+'^what.*time'
+'^set.*timer'
+'^remind\\s+me'
+```
+</CodeGroup>
+
+### Fallback Strategy
+
+The router handles failures gracefully:
+
+1. If Tier 2 (local) fails or produces low-confidence output, it automatically escalates to Tier 3 (cloud)
+2. If Tier 3 (cloud) is unavailable (network down), it falls back to Tier 2 with a degraded capability warning
+3. Classification errors are tracked so thresholds can be adjusted over time
+
+### Bypassing the Router
+
+To skip the router and use a single provider directly:
+
+```bash
+# Use Claude directly (no local routing)
+COMMAND_PROVIDER=claude
+
+# Use Ollama directly (no cloud fallback)
+COMMAND_PROVIDER=ollama
+```
+
+## Provider Architecture Summary
+
+<CardGroup cols={2}>
+  <Card title="Claude (Cloud)" icon="cloud">
+    Complex reasoning, multi-step tasks, creative generation. Sonnet 4 default, Haiku 4.5 for voice speed.
+  </Card>
+  <Card title="Ollama (Local)" icon="server">
+    Simple queries, privacy-sensitive requests, intent classification. Qwen3 models via local GPU.
+  </Card>
+  <Card title="speaches (Voice)" icon="microphone">
+    Self-hosted STT (Faster Whisper) and TTS (Kokoro). OpenAI-compatible API on port 8000.
+  </Card>
+  <Card title="Model Router" icon="route">
+    Three-tier routing: classify intent, try local, fall back to cloud. Cost and privacy aware.
+  </Card>
+</CardGroup>

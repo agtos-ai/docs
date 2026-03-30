@@ -1,8 +1,247 @@
 ---
-title: "memory"
-description: "Documentation for memory"
+title: "Memory System"
+description: "Three-tier agent memory — working, episodic, and semantic — for personalized, context-aware interactions"
 ---
 
-# memory
+agtOS implements a three-tier memory system that gives the agent the ability to remember conversation context within a session, recall past interactions across sessions, and build long-term knowledge about users and their preferences.
 
-<Info>This page is being written. Check back soon or contribute at [github.com/agtos-ai/docs](https://github.com/agtos-ai/docs).</Info>
+## Why Memory Matters
+
+Without memory, a voice agent is stateless. It asks the same clarifying questions every session, cannot reference previous conversations, and feels impersonal. The memory system solves this by providing three layers of recall, each serving a different purpose.
+
+## Memory Tiers
+
+<CardGroup cols={3}>
+  <Card title="Working Memory" icon="brain">
+    **Current session context**
+
+    Recent conversation turns, active tool results, current task state. Always available -- no external dependencies.
+  </Card>
+  <Card title="Episodic Memory" icon="book-open">
+    **Cross-session recall**
+
+    Conversation summaries, extracted facts, user corrections. Stored in Redis with configurable TTL.
+  </Card>
+  <Card title="Semantic Memory" icon="magnifying-glass">
+    **Long-term knowledge**
+
+    User preferences, learned facts, entity relationships. Embedding-based vector search for semantic retrieval.
+  </Card>
+</CardGroup>
+
+## Working Memory
+
+Working memory is the conversation context available to the LLM during the current session. It lives directly in the LLM's context window.
+
+**Scope**: Current session only
+**Storage**: In-process (no external dependencies)
+**Contents**: Recent conversation turns, active tool results, current task state
+
+Working memory is managed by the session manager and passed in the `messages` array to the LLM. When the conversation grows long, automatic summarization compresses older turns into a summary, keeping the context window focused on recent and relevant information.
+
+```
+Turn 1: User asks about weather → stored in working memory
+Turn 2: Agent responds with forecast → stored in working memory
+Turn 3: User asks follow-up → LLM sees both previous turns
+...
+Turn 20: Older turns are summarized → "User discussed weather, then scheduling"
+```
+
+<Tip>
+Working memory always works, even without Redis. It is the baseline that ensures every conversation has context, regardless of infrastructure availability.
+</Tip>
+
+## Episodic Memory
+
+Episodic memory preserves conversation knowledge after a session ends. When a session completes, the system uses an LLM to summarize the conversation and extract key facts, then stores these in Redis.
+
+**Scope**: Retained across sessions
+**Storage**: Redis with TTL-based expiration (default 30 days)
+**Contents**: Conversation summaries, extracted facts, user corrections, task outcomes
+
+### How Memories Are Saved
+
+Not every conversation is worth remembering. The episodic memory system uses heuristic save decisions to determine what to persist:
+
+- Conversations with user corrections or preferences are always saved
+- Task completions and their outcomes are saved
+- Short, trivial exchanges (greetings, single-turn lookups) may be skipped
+- An importance score (0.0-1.0) is assigned to each episode
+
+### Querying Episodes
+
+Episodic memories can be retrieved by recency or keyword search:
+
+```bash
+# Get recent episodes
+curl http://localhost:4102/api/memory/episodes?limit=10
+
+# Search episodes by keyword
+curl "http://localhost:4102/api/memory/search?q=weather+forecast&limit=5"
+```
+
+<CodeGroup>
+```json Response: GET /api/memory/episodes
+{
+  "episodes": [
+    {
+      "id": "ep-abc123",
+      "summary": "User asked about weather forecast for San Francisco",
+      "keywords": ["weather", "forecast", "san francisco"],
+      "topic": "weather",
+      "timestamp": 1711612800000,
+      "importance": 0.7,
+      "type": "conversation"
+    }
+  ],
+  "count": 1,
+  "available": true
+}
+```
+
+```json Response: GET /api/memory/search
+{
+  "query": "weather forecast",
+  "results": [
+    {
+      "id": "ep-abc123",
+      "summary": "User asked about weather forecast for San Francisco",
+      "keywords": ["weather", "forecast", "san francisco"],
+      "topic": "weather",
+      "timestamp": 1711612800000,
+      "importance": 0.7,
+      "type": "conversation",
+      "score": 0.92,
+      "matchType": "semantic"
+    }
+  ],
+  "count": 1
+}
+```
+</CodeGroup>
+
+## Semantic Memory
+
+Semantic memory provides long-term knowledge storage with embedding-based vector search. Unlike episodic memory (which stores summaries of specific conversations), semantic memory stores distilled facts, preferences, and patterns that persist indefinitely.
+
+**Scope**: Cross-session, permanent until explicitly deleted
+**Storage**: Redis Vector Search (HNSW indexing)
+**Contents**: User preferences, learned facts, entity relationships, behavioral patterns
+
+### How It Works
+
+1. **Embedding generation**: When a memory is stored, its text is converted to a dense vector using an embedding model
+2. **Vector indexing**: The embedding is stored in Redis Vector Search with HNSW indexing for fast approximate nearest-neighbor search
+3. **Semantic retrieval**: When the agent needs context, the current query is embedded and compared against stored memories using cosine similarity
+4. **Relevance threshold**: Only memories above a configurable similarity threshold are included in the LLM context
+
+### Embedding Providers
+
+| Provider | Dimensions | Use Case |
+|----------|-----------|----------|
+| Ollama (nomic-embed-text) | 768 | Local/private, no external API calls |
+| MiniLM-L6 | 384 | Lightweight local option |
+| OpenAI text-embedding-3-small | 1536 | Highest quality, requires API key |
+
+<Note>
+Semantic memory requires both Redis (with the RediSearch module) and an embedding provider (Ollama or OpenAI). If either is unavailable, semantic memory falls back to episodic keyword search.
+</Note>
+
+## Context Assembly
+
+Before each LLM call, the Memory Coordinator assembles a context packet that combines all three memory tiers:
+
+<Steps>
+  <Step title="Working Memory">
+    Current conversation turns are already in the messages array.
+  </Step>
+  <Step title="Episodic Recall">
+    Relevant session summaries are retrieved from Redis based on semantic similarity to the current query.
+  </Step>
+  <Step title="Semantic Recall">
+    Relevant long-term memories are retrieved from the vector store based on embedding similarity.
+  </Step>
+  <Step title="Deduplication">
+    Redundant information across layers is removed.
+  </Step>
+  <Step title="Prioritization">
+    Memories are ranked by relevance score and recency, then fit within a token budget.
+  </Step>
+  <Step title="Context Injection">
+    The assembled memories are formatted as a system prompt section for the LLM.
+  </Step>
+</Steps>
+
+## Memory Coordinator
+
+The `MemoryCoordinator` is the unified facade for the three-tier system. It provides a single entry point for the orchestrator and agent loop, handling the complexity of coordinating across tiers.
+
+Graceful degradation is built in:
+
+- **Working memory** (in-process) always works -- no external dependencies
+- **Episodic memory** (Redis) is optional -- logs warnings if unavailable
+- **Semantic memory** (Redis + Ollama) is optional -- falls back to episodic keyword search
+
+This means agtOS works on a fresh install with no Redis and no Ollama. As you add infrastructure, memory capabilities unlock progressively.
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/memory/episodes` | List recent episodic memories |
+| `GET` | `/api/memory/search?q=...` | Semantic + keyword search across episodes |
+
+### Query Parameters
+
+**GET /api/memory/episodes**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | number | `20` | Max results (1-100) |
+
+**GET /api/memory/search**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `q` | string | -- | Required. Search query text |
+| `limit` | number | `10` | Max results (1-50) |
+
+## Configuration
+
+```bash
+# Redis URL (required for episodic and semantic memory)
+REDIS_URL=redis://localhost:6379
+
+# Episodic memory TTL (seconds, default 30 days)
+AGTOS_MEMORY_EPISODE_TTL=2592000
+
+# Embedding provider for semantic memory
+AGTOS_EMBEDDING_PROVIDER=ollama
+AGTOS_EMBEDDING_MODEL=nomic-embed-text
+
+# Ollama URL (for local embeddings)
+OLLAMA_URL=http://localhost:11434
+```
+
+<Accordion title="Working memory configuration">
+Working memory settings control how conversation history is managed within a session:
+
+```bash
+# Maximum conversation turns before summarization kicks in
+AGTOS_WORKING_MEMORY_MAX_TURNS=20
+
+# Token budget for the summary of older turns
+AGTOS_WORKING_MEMORY_SUMMARY_TOKENS=500
+```
+
+When conversation length exceeds `max_turns`, older turns are summarized by the LLM into a condensed context, keeping the working memory focused and within token limits.
+</Accordion>
+
+## Privacy and Data Control
+
+The memory system includes privacy controls:
+
+- **Explicit deletion**: Memories can be removed via the `forget()` protocol method
+- **TTL expiration**: Episodic memories expire after a configurable period (default 30 days)
+- **Per-user isolation**: Memories are scoped to individual users via device-to-user mapping
+- **User preferences**: Privacy settings allow users to opt out of memory persistence entirely

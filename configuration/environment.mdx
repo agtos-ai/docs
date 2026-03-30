@@ -1,8 +1,247 @@
 ---
-title: "environment"
-description: "Documentation for environment"
+title: "Environment Variables"
+description: "Complete reference for all agtOS environment variables"
 ---
 
-# environment
+agtOS reads configuration from environment variables, with optional file-based config as a fallback. Environment variables always take precedence over config file values.
 
-<Info>This page is being written. Check back soon or contribute at [github.com/agtos-ai/docs](https://github.com/agtos-ai/docs).</Info>
+## Configuration Loading Order
+
+<Steps>
+  <Step title="Load .env.local">
+    Secrets and local overrides. Never committed to git.
+  </Step>
+  <Step title="Load .env">
+    Shared defaults. Can be committed to git.
+  </Step>
+  <Step title="Load JSON config file">
+    `/etc/agtos/config.json` or the path in `AGTOS_CONFIG_PATH`. Only fills gaps not covered by env vars.
+  </Step>
+</Steps>
+
+Environment variables set in `.env.local` or `.env` override the JSON config file. The JSON file is useful for Docker deployments and server configurations where you want a single config file.
+
+```json
+// /etc/agtos/config.json (example)
+{
+  "REDIS_URL": "redis://redis:6379",
+  "VOICE_PORT": "3000",
+  "LOG_LEVEL": "info"
+}
+```
+
+## Server Ports
+
+| Variable | Default | Description |
+|---|---|---|
+| `VOICE_PORT` | `3000` | Voice pipeline WebSocket server (audio streaming, signaling) |
+| `PORT` | `3000` | Alias for `VOICE_PORT` |
+| `MCP_PORT` | `4100` | MCP server (Streamable HTTP) |
+| `HEALTH_PORT` | `4102` | Health endpoints, REST API, metrics, and dashboard |
+
+<Note>
+The Tauri desktop app and web dashboard connect to the same ports via localhost. The health port serves the REST API, Prometheus metrics, static dashboard files, and health checks.
+</Note>
+
+## Authentication
+
+### Claude / Anthropic
+
+| Variable | Default | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | -- | Standard API key (`sk-ant-api03-` prefix). Pay-per-token billing. |
+| `ANTHROPIC_AUTH_TOKEN` | -- | Max/Pro subscription OAuth token (`sk-ant-oat01-` prefix). Uses `claude` CLI subprocess. |
+| `CLAUDE_CODE_OAUTH_TOKEN` | -- | Alias for `ANTHROPIC_AUTH_TOKEN` |
+| `CLAUDE_API_KEY` | -- | Legacy alias for `ANTHROPIC_API_KEY`. Auto-detected by token prefix. |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Custom API endpoint (for proxies or CLI transport) |
+
+Token priority order:
+1. `ANTHROPIC_AUTH_TOKEN` / `CLAUDE_CODE_OAUTH_TOKEN` -- CLI transport
+2. `ANTHROPIC_API_KEY` / `CLAUDE_API_KEY` -- SDK transport
+
+See [Authentication](/configuration/authentication) for detailed setup instructions.
+
+### API Security
+
+| Variable | Default | Description |
+|---|---|---|
+| `AGTOS_API_KEY` | -- (disabled) | When set, all `/api/*` routes require `Authorization: Bearer <key>`. When unset, endpoints are open. |
+| `API_RATE_LIMIT` | `100` | Max API requests per minute per client IP |
+| `CHAT_RATE_LIMIT` | `20` | Max chat/task requests per minute per client IP |
+
+<Warning>
+In production, always set `AGTOS_API_KEY` to protect the REST API. Without it, all endpoints are unauthenticated.
+</Warning>
+
+## Claude Options
+
+| Variable | Default | Description |
+|---|---|---|
+| `CLAUDE_MODEL` | `claude-sonnet-4-20250514` | Model for cloud inference via the model router |
+| `CLAUDE_THINKING` | -- (SDK default) | Adaptive thinking mode: `adaptive`, `enabled`, `disabled` |
+| `CLAUDE_EFFORT` | -- (SDK default) | Effort level: `low`, `medium`, `high`, `max` (max = Opus 4.6 only) |
+| `CLAUDE_SERVICE_TIER` | -- (SDK default) | Service tier: `auto` (priority if available), `standard_only` |
+| `CLAUDE_AGENT_MODEL` | `claude-haiku-4-5-20251001` | Model for Agent SDK credential validation |
+| `CLAUDE_CLI_PATH` | -- (auto-detect) | Explicit path to `claude` CLI binary |
+
+## Ollama Options
+
+| Variable | Default | Description |
+|---|---|---|
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama API server URL |
+| `OLLAMA_DEFAULT_MODEL` | `qwen3:4b` | Model for local query execution (Tier 2) |
+| `OLLAMA_INTENT_MODEL` | `qwen3:1.7b` | Small model for intent classification (Tier 1) |
+| `OLLAMA_URL` | `http://localhost:11434` | Alias used by credential validation |
+
+## STT / TTS (speaches)
+
+| Variable | Default | Description |
+|---|---|---|
+| `SPEACHES_URL` | `http://localhost:8000` | speaches server base URL (shared by STT and TTS) |
+| `STT_PROVIDER` | `speaches` | STT provider name |
+| `SPEACHES_STT_MODEL` | `Systran/faster-whisper-small` | Faster Whisper model for transcription |
+| `TTS_PROVIDER` | `speaches` | TTS provider name |
+| `SPEACHES_TTS_MODEL` | `speaches-ai/Kokoro-82M-v1.0-ONNX` | Kokoro model for speech synthesis |
+| `SPEACHES_TTS_VOICE` | `af_heart` | Default TTS voice ID |
+
+## Voice Pipeline
+
+| Variable | Default | Description |
+|---|---|---|
+| `COMMAND_PROVIDER` | `model-router` | LLM provider for the voice pipeline: `model-router`, `claude`, or `ollama` |
+
+## Redis
+
+| Variable | Default | Description |
+|---|---|---|
+| `REDIS_URL` | `redis://localhost:6379` | Redis connection URL. Used for sessions, memory, scheduler, events, devices, and preferences. |
+| `REDIS_HOST` | -- | Alternative to `REDIS_URL` (host component) |
+| `REDIS_PORT` | -- | Alternative to `REDIS_URL` (port component) |
+| `REDIS_PASSWORD` | -- | Redis auth password (if using authenticated Redis) |
+
+<Info>
+Redis is optional but recommended. Without it, the scheduler, episodic/semantic memory, device registry, and user preferences are disabled. Session management falls back to in-memory storage.
+</Info>
+
+## Networking
+
+| Variable | Default | Description |
+|---|---|---|
+| `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origins (comma-separated). Tauri origins are auto-added. |
+
+Tauri 2 desktop app origins (`tauri://localhost`, `https://tauri.localhost`) are always included regardless of `CORS_ORIGIN`.
+
+## Logging
+
+| Variable | Default | Description |
+|---|---|---|
+| `LOG_LEVEL` | `info` (production), `debug` (development) | Log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal` |
+| `NODE_ENV` | -- | Set to `production` for JSON structured logging |
+
+## Feature Flags
+
+| Variable | Default | Description |
+|---|---|---|
+| `AGTOS_MDNS_ENABLED` | `false` | Enable mDNS UDP multicast for ESP32 zero-config discovery |
+
+## Credentials / Encryption
+
+| Variable | Default | Description |
+|---|---|---|
+| `AGTOS_CREDENTIAL_SECRET` | `agtos-dev-secret-...` | AES-256-GCM encryption key for BYOK credential storage. Change in production. |
+| `AGTOS_CREDENTIAL_SALT` | -- (random per restart) | Hex-encoded 16-byte salt for key derivation. Required in production for persistence across restarts. |
+
+Generate a salt:
+```bash
+node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
+```
+
+## Config File
+
+| Variable | Default | Description |
+|---|---|---|
+| `AGTOS_CONFIG_PATH` | `/etc/agtos/config.json` | Path to JSON config file. File values fill gaps not covered by env vars. |
+
+## CLI
+
+| Variable | Default | Description |
+|---|---|---|
+| `AGTOS_API_URL` | `http://localhost:4102` | API base URL for the `npx agtos` CLI tool |
+
+## Complete `.env.local` Example
+
+<Accordion title="Full example with all common variables">
+```bash
+# === Claude Authentication (pick one) ===
+ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
+# ANTHROPIC_AUTH_TOKEN=sk-ant-oat01-your-oauth-token
+
+# === Claude Options ===
+CLAUDE_MODEL=claude-sonnet-4-20250514
+CLAUDE_THINKING=adaptive
+CLAUDE_EFFORT=medium
+CLAUDE_SERVICE_TIER=auto
+
+# === Ollama ===
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_DEFAULT_MODEL=qwen3:4b
+OLLAMA_INTENT_MODEL=qwen3:1.7b
+
+# === speaches STT/TTS ===
+SPEACHES_URL=http://localhost:8000
+SPEACHES_STT_MODEL=Systran/faster-whisper-small
+SPEACHES_TTS_MODEL=speaches-ai/Kokoro-82M-v1.0-ONNX
+SPEACHES_TTS_VOICE=af_heart
+
+# === Voice Pipeline ===
+COMMAND_PROVIDER=model-router
+
+# === Redis ===
+REDIS_URL=redis://localhost:6379
+
+# === Ports ===
+VOICE_PORT=3000
+MCP_PORT=4100
+HEALTH_PORT=4102
+
+# === Security ===
+AGTOS_API_KEY=your-secret-api-key
+API_RATE_LIMIT=100
+CHAT_RATE_LIMIT=20
+AGTOS_CREDENTIAL_SALT=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
+
+# === Networking ===
+CORS_ORIGIN=http://localhost:5173
+
+# === Logging ===
+LOG_LEVEL=info
+NODE_ENV=production
+
+# === Features ===
+AGTOS_MDNS_ENABLED=false
+```
+</Accordion>
+
+## Docker Environment
+
+When running with Docker, set variables via `docker-compose.yml` or `docker run -e`:
+
+```yaml
+# docker-compose.yml (excerpt)
+services:
+  agtos:
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - VOICE_PORT=3000
+      - MCP_PORT=4100
+      - HEALTH_PORT=4102
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - SPEACHES_URL=http://host.docker.internal:8000
+      - NODE_ENV=production
+    env_file:
+      - .env.local  # secrets
+```
+
+<Tip>
+Use `host.docker.internal` to reach services running on the Docker host (like Ollama or speaches). On Linux, you may need `--network=host` or extra Docker config instead.
+</Tip>

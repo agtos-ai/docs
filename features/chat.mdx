@@ -1,8 +1,233 @@
 ---
-title: "chat"
-description: "Documentation for chat"
+title: "Chat API"
+description: "Text-based chat with agent reasoning, model routing, and tool execution"
 ---
 
-# chat
+The Chat API provides a text-based interface to the same agent reasoning loop that powers the voice pipeline. Send a message, get a response -- with optional session continuity, tool execution, and intelligent model routing.
 
-<Info>This page is being written. Check back soon or contribute at [github.com/agtos-ai/docs](https://github.com/agtos-ai/docs).</Info>
+## Endpoint
+
+```
+POST /api/chat
+```
+
+**Base URL**: `http://<host>:4102/api`
+
+The chat endpoint is served on the health/API server (port 4102), not the voice server (port 3000).
+
+### Request
+
+```json
+{
+  "text": "What's the weather like today?",
+  "sessionId": "session-abc123",
+  "platform": "web"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `text` | string | Yes | The user's message. Must be non-empty, max 10,000 characters. |
+| `sessionId` | string | No | Session ID for conversation continuity. Omit for stateless. |
+| `platform` | string | No | Client platform identifier (defaults to `web`). |
+
+### Response
+
+```json
+{
+  "text": "Based on current conditions, it's sunny and 72 degrees in your area.",
+  "sessionId": "session-abc123",
+  "platform": "web",
+  "metadata": {
+    "stepCount": 2,
+    "toolCallCount": 1,
+    "durationMs": 1450
+  }
+}
+```
+
+The `metadata` object provides transparency into what happened during processing:
+
+- **stepCount**: How many reasoning steps the agent took (including tool calls)
+- **toolCallCount**: How many tools were invoked
+- **durationMs**: Total processing time in milliseconds
+
+## Model Router
+
+The chat endpoint routes requests through a three-tier model routing system. This system balances speed, cost, and capability by using the right model for each request.
+
+<Steps>
+  <Step title="Intent Classification">
+    A lightweight local model (Ollama) classifies the user's intent into categories like `general_knowledge`, `smart_home`, `scheduling`, `code`, etc. This classification takes 10-50ms.
+  </Step>
+  <Step title="Local Model Attempt">
+    For simple queries (greetings, basic facts, quick lookups), the local Ollama model handles the request directly. No cloud API call needed.
+  </Step>
+  <Step title="Cloud Fallback">
+    For complex queries requiring reasoning, tool use, or multi-step planning, the request is routed to Claude. The intent classification helps select the right Claude model (Haiku for simple tasks, Sonnet/Opus for complex ones).
+  </Step>
+</Steps>
+
+```
+User Input → Intent Classifier (Ollama)
+                 │
+                 ├─ Simple → Local Model (Ollama) → Response
+                 │
+                 └─ Complex → Claude (Haiku/Sonnet) → Response
+                                    │
+                                    └─ May call tools via Agent Loop
+```
+
+<Info>
+If Ollama is unavailable, all requests fall through directly to Claude. The routing system is designed for graceful degradation, not hard dependencies.
+</Info>
+
+## Agent Reasoning Loop
+
+When a request requires tool use, the chat endpoint runs the full agent reasoning loop:
+
+1. The LLM receives the user's message along with available tools
+2. If the LLM decides to call a tool, the tool is executed and the result is fed back
+3. This loop continues until the LLM produces a final text response
+4. The complete response (including tool results) is returned to the caller
+
+The agent loop is provider-agnostic -- it works with both Claude and Ollama through the `CommandProtocol` interface.
+
+<Accordion title="Example: Multi-step tool execution">
+A request like "Schedule a morning briefing for 7 AM every day" might involve:
+
+1. **Step 1**: LLM recognizes the scheduling intent and calls `schedule.create`
+2. **Step 2**: The scheduler tool creates a cron task and returns the task ID
+3. **Step 3**: LLM formats the confirmation response with the task details
+
+```json
+{
+  "text": "I've created a recurring morning briefing scheduled for 7:00 AM daily. Task ID: task-abc123.",
+  "metadata": {
+    "stepCount": 3,
+    "toolCallCount": 1,
+    "durationMs": 2100
+  }
+}
+```
+</Accordion>
+
+## Session Management
+
+Passing a `sessionId` enables conversation continuity. The session system provides:
+
+- **Working memory**: Recent conversation turns are maintained in the LLM's context
+- **Episodic memory**: Past conversations are summarized and available for recall
+- **Semantic memory**: Long-term facts and preferences are retrieved via vector search
+
+When no `sessionId` is provided, the request is stateless -- there is no conversation history.
+
+```bash
+# First message — start a new session
+curl -X POST http://localhost:4102/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"text": "My name is Alex", "sessionId": "session-001"}'
+
+# Follow-up — same session, agent remembers context
+curl -X POST http://localhost:4102/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"text": "What is my name?", "sessionId": "session-001"}'
+```
+
+## Input Validation
+
+All requests are validated using Zod schemas before processing:
+
+- `text` must be a non-empty string (max 10,000 characters)
+- Request bodies are capped at 1 MB
+- Invalid JSON returns `400`
+- Missing or empty `text` field returns `400` with validation details
+
+```json
+// 400 Bad Request
+{
+  "error": "Validation failed",
+  "issues": ["Text is required"]
+}
+```
+
+## Rate Limiting
+
+The chat endpoint has a stricter rate limit than general API endpoints:
+
+| Scope | Default Limit | Environment Variable |
+|-------|--------------|---------------------|
+| General API | 100 req/min | `AGTOS_API_RATE_LIMIT` |
+| Chat + Tasks | 20 req/min | `AGTOS_CHAT_RATE_LIMIT` |
+
+Rate limit information is included in response headers:
+
+```
+X-RateLimit-Remaining: 18
+```
+
+When the limit is exceeded:
+
+```json
+// 429 Too Many Requests
+{
+  "error": "Too many requests",
+  "retryAfter": 60
+}
+```
+
+## Authentication
+
+When `AGTOS_API_KEY` is set, the chat endpoint requires a Bearer token:
+
+```bash
+curl -X POST http://localhost:4102/api/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
+  -d '{"text": "Hello"}'
+```
+
+<Note>
+Authentication is opt-in. If `AGTOS_API_KEY` is not set, the endpoint is open. See [Authentication](/configuration/authentication) for details on configuring API access.
+</Note>
+
+## Error Responses
+
+| Status | Meaning | Common Cause |
+|--------|---------|-------------|
+| `400` | Bad Request | Missing/empty `text`, invalid JSON, validation failure |
+| `401` | Unauthorized | Missing or invalid API key (when auth is enabled) |
+| `429` | Too Many Requests | Rate limit exceeded |
+| `500` | Internal Server Error | Model provider timeout, agent loop failure |
+| `503` | Service Unavailable | Voice pipeline not initialized |
+
+## CLI Integration
+
+The `npx agtos chat` command uses this same endpoint under the hood:
+
+```bash
+# Interactive chat session
+npx agtos chat
+
+# Single message
+npx agtos chat "What time is it?"
+
+# With session persistence
+npx agtos chat --session my-session "Remember this for later"
+```
+
+## Background Tasks
+
+For longer-running agent tasks, use the tasks endpoint instead:
+
+```
+POST /api/tasks
+```
+
+```json
+{
+  "topic": "Summarize the latest news about AI safety"
+}
+```
+
+Tasks run through the same agent reasoning loop but are designed for workloads that may take several seconds. The response includes a generated `taskId` for tracking.

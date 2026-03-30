@@ -1,8 +1,517 @@
 ---
-title: "mcp tools"
-description: "Documentation for mcp tools"
+title: "MCP Tools"
+description: "Model Context Protocol tool reference for voice, system, workflow, and scheduling integration"
 ---
 
-# mcp tools
+agtOS exposes an MCP (Model Context Protocol) server via Streamable HTTP transport. External AI clients can connect to invoke voice pipeline, system monitoring, workflow, and scheduling tools.
 
-<Info>This page is being written. Check back soon or contribute at [github.com/agtos-ai/docs](https://github.com/agtos-ai/docs).</Info>
+**Endpoint**: `http://<host>:<MCP_PORT>/mcp`
+
+Default: `http://localhost:4100/mcp`
+
+**Transport**: Streamable HTTP ([ADR-005](/architecture/decisions))
+
+**Server Name**: `agtos` | **Server Version**: `1.0.0`
+
+## Voice Tools
+
+<Accordion title="voice.speak — Speak Text">
+
+Synthesize text to speech and play it through the agtOS voice pipeline. Returns confirmation when synthesis begins.
+
+### Input Schema
+
+<ParamField body="text" type="string" required>
+  The text to speak (min length: 1).
+</ParamField>
+
+<ParamField body="voice" type="string">
+  Voice name override (e.g. `"af_heart"`).
+</ParamField>
+
+<ParamField body="sessionId" type="string">
+  Target voice session ID. Omit for default session.
+</ParamField>
+
+### Example Input
+
+```json
+{
+  "text": "Good morning. The weather today is sunny with a high of 72 degrees.",
+  "voice": "af_heart"
+}
+```
+
+### Success Response
+
+```
+Speaking: "Good morning. The weather today is sunny with a high of 72 deg..." [status: queued]
+```
+
+### Error Response
+
+```
+Error: TTS provider unavailable
+```
+
+</Accordion>
+
+<Accordion title="voice.listen — Listen for Speech">
+
+Start listening for speech input via the agtOS voice pipeline. Returns the transcribed text when speech is detected and processed.
+
+### Input Schema
+
+<ParamField body="durationMs" type="number">
+  Maximum listen duration in milliseconds (default: 5000, max: 30000). Must be a positive integer.
+</ParamField>
+
+<ParamField body="sessionId" type="string">
+  Target voice session ID. Omit for default session.
+</ParamField>
+
+### Example Input
+
+```json
+{
+  "durationMs": 10000
+}
+```
+
+### Success Response
+
+```
+Turn on the kitchen lights and set a timer for 5 minutes.
+```
+
+If no speech is detected:
+
+```
+(no speech detected)
+```
+
+### Error Response
+
+```
+Error: STT provider unavailable
+```
+
+</Accordion>
+
+## System Tools
+
+<Accordion title="system.health — System Health">
+
+Get comprehensive system health status including all registered services (Redis, STT, TTS, Ollama, Claude). Returns per-service status, response times, and overall system health.
+
+### Input Schema
+
+No input parameters.
+
+### Success Response
+
+```json
+{
+  "status": "healthy",
+  "services": {
+    "redis": { "status": "healthy", "responseTime": 2 },
+    "stt-speaches": { "status": "healthy", "responseTime": 45 },
+    "tts-speaches": { "status": "healthy", "responseTime": 38 },
+    "ollama": { "status": "healthy", "responseTime": 12 }
+  },
+  "metrics": {
+    "requestsPerMinute": 15,
+    "errorsPerMinute": 0,
+    "activeSessions": 2,
+    "latency": {
+      "p50": 120,
+      "p95": 450,
+      "p99": 800
+    }
+  }
+}
+```
+
+### Error Response
+
+```
+Health check failed: Redis connection refused
+```
+
+</Accordion>
+
+<Accordion title="session.status — Session Status">
+
+Get information about voice sessions. When called without a `sessionId`, returns a summary of all active sessions. When called with a specific `sessionId`, returns detailed information about that session.
+
+### Input Schema
+
+<ParamField body="sessionId" type="string">
+  Specific session ID to query. Omit for overview of all sessions.
+</ParamField>
+
+### Example Input (all sessions)
+
+```json
+{}
+```
+
+### Example Input (specific session)
+
+```json
+{
+  "sessionId": "session-a1b2c3d4e5f6"
+}
+```
+
+### Success Response (all sessions)
+
+```json
+{
+  "sessions": [
+    { "id": "session-a1b2c3d4e5f6", "isActive": true },
+    { "id": "session-f6e5d4c3b2a1", "isActive": true }
+  ],
+  "activeSessions": 2
+}
+```
+
+### Error Response
+
+```
+Error: Session not found
+```
+
+</Accordion>
+
+## Orchestration Tools
+
+<Note>
+Orchestration tools are conditionally registered. Workflow tools require a workflow engine; scheduler tools require a Redis-backed scheduler. If neither is available, orchestration tools are skipped entirely.
+</Note>
+
+<Accordion title="workflow.run — Run Workflow">
+
+Execute a registered workflow by ID with optional input. Returns the execution ID and final state.
+
+### Input Schema
+
+<ParamField body="workflowId" type="string" required>
+  ID of the registered workflow to execute (min: 1).
+</ParamField>
+
+<ParamField body="input" type="object">
+  Optional input payload to pass to the workflow.
+</ParamField>
+
+### Example Input
+
+```json
+{
+  "workflowId": "morning-routine",
+  "input": {
+    "location": "San Francisco"
+  }
+}
+```
+
+### Success Response
+
+```json
+{
+  "executionId": "exec-789abc",
+  "workflowId": "morning-routine",
+  "state": "completed",
+  "startTime": 1711612800000,
+  "endTime": 1711612802000
+}
+```
+
+### Error Response
+
+```
+Error: Workflow engine not available
+```
+
+```
+Error: Workflow 'nonexistent' not found
+```
+
+</Accordion>
+
+<Accordion title="workflow.list — List Workflows">
+
+List all registered workflow definitions. Returns workflow IDs, names, descriptions, and step counts.
+
+### Input Schema
+
+No input parameters.
+
+### Success Response
+
+```json
+[
+  {
+    "id": "morning-routine",
+    "name": "Morning Routine",
+    "description": "Plays morning briefing and checks calendar",
+    "stepCount": 3
+  }
+]
+```
+
+### Error Response
+
+```
+Error: Workflow engine not available
+```
+
+</Accordion>
+
+<Accordion title="schedule.create — Create Scheduled Task">
+
+Create a new scheduled task. Supports cron expressions for recurring tasks, one-time execution at a timestamp, or interval-based repetition.
+
+### Input Schema
+
+<ParamField body="name" type="string" required>
+  Human-readable name for the scheduled task (min: 1).
+</ParamField>
+
+<ParamField body="scheduleType" type="string" required>
+  Type of schedule: `cron`, `once`, or `interval`.
+</ParamField>
+
+<ParamField body="expression" type="string">
+  Cron expression (e.g. `"*/5 * * * *"`). Required when `scheduleType` is `cron`.
+</ParamField>
+
+<ParamField body="atTimestamp" type="number">
+  Unix millisecond timestamp. Required when `scheduleType` is `once`.
+</ParamField>
+
+<ParamField body="intervalMs" type="number">
+  Interval in milliseconds. Required when `scheduleType` is `interval`.
+</ParamField>
+
+<ParamField body="eventTopic" type="string" required>
+  Event bus topic to publish when the task fires (min: 1).
+</ParamField>
+
+<ParamField body="payload" type="object">
+  Optional payload included in the fired event.
+</ParamField>
+
+### Example Input (cron)
+
+```json
+{
+  "name": "Morning briefing",
+  "scheduleType": "cron",
+  "expression": "0 7 * * *",
+  "eventTopic": "briefing.morning",
+  "payload": { "workflowId": "morning-routine" }
+}
+```
+
+### Example Input (once)
+
+```json
+{
+  "name": "Meeting reminder",
+  "scheduleType": "once",
+  "atTimestamp": 1711699200000,
+  "eventTopic": "reminder.fire",
+  "payload": { "message": "Team standup in 5 minutes" }
+}
+```
+
+### Example Input (interval)
+
+```json
+{
+  "name": "System heartbeat",
+  "scheduleType": "interval",
+  "intervalMs": 60000,
+  "eventTopic": "system.heartbeat"
+}
+```
+
+### Success Response
+
+```json
+{
+  "taskId": "task-abc123",
+  "name": "Morning briefing",
+  "status": "active",
+  "nextRunAt": 1711699200000,
+  "scheduleType": "cron"
+}
+```
+
+### Error Response
+
+```
+Error: Task scheduler not available
+```
+
+```
+Error: "expression" is required for cron schedules
+```
+
+</Accordion>
+
+<Accordion title="schedule.list — List Scheduled Tasks">
+
+List all scheduled tasks with optional status filtering. Returns task IDs, names, statuses, schedule types, and next run times.
+
+### Input Schema
+
+<ParamField body="status" type="string">
+  Filter by status: `active`, `paused`, `completed`, `cancelled`, `failed`.
+</ParamField>
+
+### Example Input
+
+```json
+{
+  "status": "active"
+}
+```
+
+### Success Response
+
+```json
+[
+  {
+    "id": "task-abc123",
+    "name": "Morning briefing",
+    "status": "active",
+    "scheduleType": "cron",
+    "nextRunAt": 1711699200000,
+    "lastRunAt": 1711612800000,
+    "runCount": 5
+  }
+]
+```
+
+### Error Response
+
+```
+Error: Task scheduler not available
+```
+
+</Accordion>
+
+<Accordion title="schedule.cancel — Cancel Scheduled Task">
+
+Cancel a scheduled task by ID. The task will no longer fire.
+
+### Input Schema
+
+<ParamField body="taskId" type="string" required>
+  ID of the scheduled task to cancel (min: 1).
+</ParamField>
+
+### Example Input
+
+```json
+{
+  "taskId": "task-abc123"
+}
+```
+
+### Success Response
+
+```
+Task task-abc123 cancelled successfully
+```
+
+### Error Response
+
+```
+Error: Task scheduler not available
+```
+
+```
+Error: Task not found
+```
+
+</Accordion>
+
+## Connecting to the MCP Server
+
+### Using the MCP SDK (Node.js)
+
+```typescript
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+
+const transport = new StreamableHTTPClientTransport(
+  new URL('http://localhost:4100/mcp')
+);
+
+const client = new Client({
+  name: 'my-client',
+  version: '1.0.0',
+});
+
+await client.connect(transport);
+
+// Call a tool
+const result = await client.callTool({
+  name: 'system.health',
+  arguments: {},
+});
+
+console.log(result.content);
+```
+
+### Using curl (for testing)
+
+The MCP protocol uses JSON-RPC over HTTP. You can test with curl by sending properly formatted JSON-RPC requests:
+
+```bash
+# Initialize the MCP session
+curl -X POST http://localhost:4100/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-03-26",
+      "capabilities": {},
+      "clientInfo": { "name": "curl-test", "version": "1.0.0" }
+    }
+  }'
+```
+
+### Claude Desktop Configuration
+
+Add agtOS as an MCP server in your Claude Desktop config (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "agtos": {
+      "url": "http://localhost:4100/mcp"
+    }
+  }
+}
+```
+
+### Tool Availability
+
+Not all tools are always available. Tool registration depends on which services are running:
+
+| Tool Group     | Dependency         | Condition                                 |
+|----------------|--------------------|-------------------------------------------|
+| Voice tools    | Voice pipeline     | Always registered (may return errors if pipeline down). |
+| System tools   | Health manager     | Always registered.                        |
+| Workflow tools | Workflow engine    | Registered only if workflow engine exists. |
+| Scheduler tools| Redis scheduler    | Registered only if Redis is connected.    |
+
+<Tip>
+Use `tools/list` to discover which tools are currently available on a running server.
+</Tip>

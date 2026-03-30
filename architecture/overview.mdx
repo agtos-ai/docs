@@ -1,8 +1,213 @@
 ---
-title: "overview"
-description: "Documentation for overview"
+title: "Architecture Overview"
+description: "Dual-layer architecture, protocol abstraction, and system design of agtOS"
 ---
 
-# overview
+agtOS is built on a dual-layer architecture that separates voice infrastructure from AI orchestration. This separation means the orchestration layer does not care *how* speech is processed, only *that* it is processed -- enabling multiple voice architectures, providers, and transport mechanisms without changing application logic.
 
-<Info>This page is being written. Check back soon or contribute at [github.com/agtos-ai/docs](https://github.com/agtos-ai/docs).</Info>
+## Dual-Layer Architecture
+
+### Infrastructure Layer
+
+The infrastructure layer handles the technical audio pipeline and connectivity:
+
+- **Voice Activity Detection (VAD)** -- detects when the user is speaking
+- **Audio encoding/decoding** -- PCM, Opus, WAV format conversion
+- **Transport** -- WebSocket audio streaming, WebRTC signaling
+- **STT/TTS** -- speech-to-text and text-to-speech via speaches server
+- **Session management** -- Redis-backed session state with TTL and device indexing
+
+This layer is analogous to TCP/IP -- it provides reliable audio transport and processing that higher layers build on.
+
+### Orchestration Layer
+
+The orchestration layer is AI-driven and protocol-agnostic:
+
+- **Protocol Gateway** -- routes requests through adapters (MCP today, A2A and AG-UI ready)
+- **Model Router** -- three-tier routing: intent classification, local model, cloud model
+- **Agent Reasoning Loop** -- multi-step tool execution via CommandProtocol
+- **Working Memory** -- per-session conversation history with automatic summarization
+- **Episodic Memory** -- cross-session recall stored in Redis
+- **Semantic Memory** -- embedding-based vector search via Redis Vector Search + Ollama
+- **Tool Registry** -- in-memory catalog with category filtering and dynamic selection
+- **Workflow Engine** -- multi-step workflow execution
+- **Task Scheduler** -- Redis-backed cron, one-shot, and interval scheduling
+
+## Voice Pipeline Modes
+
+agtOS supports three voice pipeline architectures through the infrastructure layer ([ADR-008](/architecture/decisions#adr-008)). The orchestration layer remains unchanged across all three.
+
+### CASCADE (Default)
+
+```
+Audio In -> VAD -> STT (speaches) -> LLM (Claude/Ollama) -> TTS (speaches) -> Audio Out
+```
+
+Each component is independently swappable. The default for development, low-cost operation, and maximum flexibility. Latency: ~500ms total.
+
+### HALF_CASCADE
+
+```
+Audio In -> VAD -> Audio LLM (Ultravox) -> TTS (speaches) -> Audio Out
+```
+
+The LLM directly processes audio tokens, eliminating the STT step. Preserves tone, emphasis, and paralinguistic cues. Latency: ~200-300ms.
+
+### NATIVE
+
+```
+Audio In -> VAD -> Native Audio API (Gemini Live / OpenAI Realtime) -> Audio Out
+```
+
+End-to-end audio processing. No separate STT or TTS. Most natural-sounding but highest cost. Latency: ~200-300ms.
+
+<Info>
+The CASCADE mode is currently the production implementation. HALF_CASCADE and NATIVE are architecturally supported and will be connected as providers mature.
+</Info>
+
+## Protocol Gateway
+
+The protocol gateway ([ADR-001](/architecture/decisions#adr-001)) abstracts protocol-specific details behind a unified internal interface. Core orchestration logic never imports protocol types directly.
+
+```
+Incoming Request
+       |
+       v
+  Protocol Gateway
+       |
+       +-- MCP Adapter (tool integration) -- active
+       +-- A2A Adapter (agent-to-agent)   -- future
+       +-- AG-UI Adapter (frontend)       -- future
+```
+
+### Why Protocol-Agnostic?
+
+MCP moved to the Linux Foundation alongside Google's A2A, signaling an industry shift toward multi-protocol futures. By abstracting protocols behind adapters, agtOS can adopt new protocols by writing an adapter -- not restructuring the application.
+
+### Platform-Aware Routing
+
+The gateway supports platform-specific adapter overrides ([ADR-015](/architecture/decisions#adr-015)):
+
+| Platform | Characteristics |
+|---|---|
+| **Web** | Default cascade pipeline via WebSocket |
+| **Desktop** | Tauri 2 native shell with system tray, global hotkey |
+| **ESP32** | Low-bandwidth audio transport, platform-specific VAD |
+| **CLI** | Text-only routing, no audio pipeline overhead |
+
+When a request includes `metadata.platform`, the gateway checks for platform-specific adapter overrides before falling back to the default. Tools can also be restricted to specific platforms via an optional `platforms` field, reducing context window usage.
+
+## Data Flow
+
+Here is the complete flow for a voice interaction using the cascade pipeline:
+
+<Steps>
+  <Step title="Audio Capture">
+    User speaks into microphone (browser WebSocket or ESP32 hardware). Audio frames stream to the voice server on port 3000.
+  </Step>
+  <Step title="Speech-to-Text">
+    The STT provider (speaches, Faster Whisper model) transcribes the audio stream into text.
+  </Step>
+  <Step title="Intent Classification">
+    The model router's Tier 1 classifier (Ollama, qwen3:1.7b) categorizes the request in under 50ms: simple query, tool use, complex reasoning, creative, or system command.
+  </Step>
+  <Step title="Model Routing">
+    Based on classification, the request goes to Tier 2 (Ollama, local) or Tier 3 (Claude, cloud). Privacy-sensitive requests always stay local.
+  </Step>
+  <Step title="Tool Execution">
+    If the LLM invokes tools, the agent reasoning loop executes them via the CommandProtocol. Tools are discovered through the MCP server and tool registry.
+  </Step>
+  <Step title="Response Streaming">
+    The LLM response streams token-by-token. Sentence boundary detection splits the stream for TTS chunking -- the first sentence starts synthesizing while later sentences are still generating.
+  </Step>
+  <Step title="Text-to-Speech">
+    The TTS provider (speaches, Kokoro model) synthesizes each sentence into audio.
+  </Step>
+  <Step title="Audio Playback">
+    Synthesized audio streams back to the client over WebSocket. The user hears the response as it generates.
+  </Step>
+</Steps>
+
+## Key Components
+
+<CardGroup cols={2}>
+  <Card title="MCP Server" icon="plug">
+    Streamable HTTP on port 4100. Exposes 9 built-in tools: `voice.speak`, `voice.listen`, `system.health`, `session.status`, `workflow.run`, `workflow.list`, `schedule.create`, `schedule.list`, `schedule.cancel`.
+  </Card>
+  <Card title="MCP Client" icon="link">
+    Connects to external MCP servers for tool discovery. Auto-discovery with reconnection support.
+  </Card>
+  <Card title="Memory System" icon="brain">
+    Three-tier memory: working (session context), episodic (cross-session Redis), semantic (vector search via Ollama embeddings + Redis).
+  </Card>
+  <Card title="REST API" icon="code">
+    13 endpoints on port 4102 with rate limiting and optional API key auth. Serves health, sessions, memory, scheduler, workflows, chat, voice status, and tasks.
+  </Card>
+  <Card title="Web Dashboard" icon="browser">
+    React 19 + Vite 6 management UI with pages for health, devices, tasks, voice, memory, conversations, configuration, and logs.
+  </Card>
+  <Card title="Desktop App" icon="desktop">
+    Tauri 2 native shell with system tray, global push-to-talk hotkey, health monitoring, and auto-start. Bundles agtOS as a Node SEA sidecar.
+  </Card>
+</CardGroup>
+
+## Tech Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Runtime** | Node.js 20+ / TypeScript | Server, CLI, all business logic |
+| **Cloud LLM** | Claude (Anthropic SDK) | Complex reasoning, agentic tasks |
+| **Local LLM** | Ollama (Qwen3, etc.) | Intent classification, simple queries |
+| **STT** | speaches (Faster Whisper) | Speech-to-text transcription |
+| **TTS** | speaches (Kokoro ONNX) | Text-to-speech synthesis |
+| **State** | Redis (node-redis v5) | Sessions, memory, scheduler, events, devices |
+| **Protocols** | MCP (Streamable HTTP) | Tool integration, external server connections |
+| **Desktop** | Tauri 2 | Native app shell with system tray, hotkeys |
+| **Dashboard** | React 19, Vite 6 | Web-based management UI |
+| **Hardware** | ESP32-S3 (XIAO Sense) | Wearable voice client firmware |
+| **Metrics** | Prometheus | /metrics endpoint with latency percentiles |
+
+## Security Model
+
+### BYOK Credentials
+
+agtOS uses Bring Your Own Key (BYOK) credential management. API keys are encrypted at rest with AES-256-GCM and a user-provided secret. Per-provider validation ensures keys are valid before storage.
+
+### API Authentication
+
+The REST API supports opt-in Bearer token authentication via `AGTOS_API_KEY`. When set, all `/api/*` routes require the header `Authorization: Bearer <key>`. Timing-safe comparison prevents timing attacks. See [Authentication](/configuration/authentication) for details.
+
+### Device Authentication
+
+ESP32 and other hardware devices authenticate via per-device SHA-256 tokens. The device registry tracks capabilities, status lifecycle, and trust levels.
+
+### Rate Limiting
+
+Token bucket rate limiting protects all API endpoints:
+- General API: 100 requests/minute per client IP
+- Chat and task endpoints: 20 requests/minute per client IP
+
+### Input Validation
+
+All POST endpoints validate input with Zod schemas and enforce a 10KB text limit to prevent abuse.
+
+## Deployment Topology
+
+```
+                    Internet
+                       |
+              +--------+--------+
+              |   agtOS Server  |
+              |                 |
+              |  :3000  Voice   |
+              |  :4100  MCP     |
+              |  :4102  API     |
+              +--------+--------+
+              |        |        |
+        +-----+   +---+---+   +-----+
+        |Redis |   |Ollama |   |speaches|
+        |:6379 |   |:11434 |   |:8000   |
+        +------+   +-------+   +--------+
+```
+
+All services can run on a single machine for development, or be distributed across hosts in production. The desktop app (Tauri) connects to the same ports via localhost.

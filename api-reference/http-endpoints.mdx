@@ -1,8 +1,790 @@
 ---
-title: "http endpoints"
-description: "Documentation for http endpoints"
+title: "HTTP Endpoints"
+description: "REST API reference for health, sessions, voice, memory, scheduling, workflows, chat, and tasks"
 ---
 
-# http endpoints
+All REST API endpoints are served on the **health server** (default port `4102`) under the `/api` prefix. Responses are JSON with `Content-Type: application/json`. CORS headers are applied at the server level.
 
-<Info>This page is being written. Check back soon or contribute at [github.com/agtos-ai/docs](https://github.com/agtos-ai/docs).</Info>
+**Base URL**: `http://<host>:4102/api`
+
+<Info>
+When the `AGTOS_API_KEY` environment variable is set, all `/api/*` endpoints require a Bearer token. See [Authentication](#authentication) below.
+</Info>
+
+## Health
+
+<Accordion title="GET /api/health">
+
+Comprehensive health status from all registered service checkers (Redis, STT, TTS, Ollama, Claude, MCP).
+
+### Response
+
+**200 OK** -- All services healthy.
+
+```json
+{
+  "status": "healthy",
+  "services": {
+    "redis": { "status": "healthy", "responseTime": 2 },
+    "stt-speaches": { "status": "healthy", "responseTime": 45 },
+    "tts-speaches": { "status": "healthy", "responseTime": 38 },
+    "ollama": { "status": "healthy", "responseTime": 12 },
+    "mcp-server": { "status": "healthy", "responseTime": 5 }
+  },
+  "timestamp": 1711612800000
+}
+```
+
+**503 Service Unavailable** -- One or more services degraded.
+
+```json
+{
+  "error": "Health check failed",
+  "message": "Redis connection refused"
+}
+```
+
+</Accordion>
+
+## Sessions
+
+<Accordion title="GET /api/sessions">
+
+List active voice sessions with connection metadata.
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "sessions": [
+    {
+      "id": "session-a1b2c3d4",
+      "connectionId": "conn-xyz",
+      "isActive": true,
+      "isSpeaking": false,
+      "lastActivity": 1711612800000
+    }
+  ],
+  "count": 1
+}
+```
+
+**503 Service Unavailable** -- Voice pipeline not initialized.
+
+```json
+{
+  "error": "Voice pipeline not available"
+}
+```
+
+</Accordion>
+
+## Voice Status
+
+<Accordion title="GET /api/voice/status">
+
+Voice pipeline availability and active session count. Always returns 200, even when the pipeline is unavailable, so the dashboard can degrade gracefully.
+
+### Response
+
+**200 OK** -- Pipeline available.
+
+```json
+{
+  "available": true,
+  "pipeline": "cascade",
+  "activeSessions": 2
+}
+```
+
+**200 OK** -- Pipeline not wired up.
+
+```json
+{
+  "available": false
+}
+```
+
+</Accordion>
+
+## Memory
+
+<Accordion title="GET /api/memory/episodes">
+
+Retrieve recent episodic memory entries.
+
+### Query Parameters
+
+<ParamField query="limit" type="number" default="20">
+  Max results to return (1--100).
+</ParamField>
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "episodes": [
+    {
+      "id": "ep-abc123",
+      "summary": "User asked about weather forecast",
+      "keywords": ["weather", "forecast"],
+      "topic": "weather",
+      "timestamp": 1711612800000,
+      "importance": 0.7,
+      "type": "conversation",
+      "score": 0.95,
+      "matchType": "keyword"
+    }
+  ],
+  "count": 1,
+  "available": true
+}
+```
+
+**503 Service Unavailable** -- Memory system not available.
+
+```json
+{
+  "error": "Memory system not available"
+}
+```
+
+</Accordion>
+
+<Accordion title="GET /api/memory/search">
+
+Semantic and keyword memory search across episodic memory.
+
+### Query Parameters
+
+<ParamField query="q" type="string" required>
+  Search query text.
+</ParamField>
+
+<ParamField query="limit" type="number" default="10">
+  Max results to return (1--50).
+</ParamField>
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "query": "what was the weather",
+  "results": [
+    {
+      "id": "ep-abc123",
+      "summary": "User asked about weather forecast",
+      "keywords": ["weather", "forecast"],
+      "topic": "weather",
+      "timestamp": 1711612800000,
+      "importance": 0.7,
+      "type": "conversation",
+      "score": 0.92,
+      "matchType": "semantic"
+    }
+  ],
+  "count": 1
+}
+```
+
+**400 Bad Request** -- Missing query parameter.
+
+```json
+{
+  "error": "Missing required query parameter: q"
+}
+```
+
+**503 Service Unavailable** -- Memory system not available.
+
+```json
+{
+  "error": "Memory system not available"
+}
+```
+
+</Accordion>
+
+## Scheduler
+
+<Accordion title="GET /api/scheduler/tasks">
+
+List all scheduled tasks.
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "tasks": [
+    {
+      "id": "task-abc123",
+      "name": "Morning briefing",
+      "status": "active",
+      "schedule": { "type": "cron", "expression": "0 7 * * *" },
+      "action": {
+        "eventTopic": "briefing.morning",
+        "payload": {}
+      },
+      "nextRunAt": 1711699200000,
+      "lastRunAt": 1711612800000,
+      "runCount": 5,
+      "createdAt": 1711526400000
+    }
+  ],
+  "count": 1
+}
+```
+
+**503 Service Unavailable** -- Scheduler not available (Redis down or not configured).
+
+```json
+{
+  "error": "Scheduler not available"
+}
+```
+
+</Accordion>
+
+<Accordion title="POST /api/scheduler/tasks">
+
+Create a new scheduled task.
+
+### Request Body
+
+<ParamField body="name" type="string" required>
+  Human-readable task name.
+</ParamField>
+
+<ParamField body="scheduleType" type="string" required>
+  One of: `cron`, `once`, `interval`.
+</ParamField>
+
+<ParamField body="expression" type="string">
+  Cron expression. Required when `scheduleType` is `cron`.
+</ParamField>
+
+<ParamField body="atTimestamp" type="number">
+  Unix ms timestamp. Required when `scheduleType` is `once`.
+</ParamField>
+
+<ParamField body="intervalMs" type="number">
+  Interval in milliseconds. Required when `scheduleType` is `interval`.
+</ParamField>
+
+<ParamField body="eventTopic" type="string" required>
+  Event bus topic published when the task fires.
+</ParamField>
+
+<ParamField body="payload" type="object">
+  Optional payload included in the fired event.
+</ParamField>
+
+### Schedule Type Examples
+
+<CodeGroup>
+
+```json Cron (recurring)
+{
+  "name": "Every 5 minutes",
+  "scheduleType": "cron",
+  "expression": "*/5 * * * *",
+  "eventTopic": "check.status"
+}
+```
+
+```json Once (one-time)
+{
+  "name": "Reminder",
+  "scheduleType": "once",
+  "atTimestamp": 1711699200000,
+  "eventTopic": "reminder.fire",
+  "payload": { "message": "Meeting in 10 minutes" }
+}
+```
+
+```json Interval (repeating)
+{
+  "name": "Heartbeat",
+  "scheduleType": "interval",
+  "intervalMs": 60000,
+  "eventTopic": "system.heartbeat"
+}
+```
+
+</CodeGroup>
+
+### Response
+
+**201 Created**
+
+```json
+{
+  "task": {
+    "id": "task-def456",
+    "name": "Morning briefing",
+    "status": "active",
+    "schedule": { "type": "cron", "expression": "0 7 * * *" },
+    "action": {
+      "eventTopic": "briefing.morning",
+      "payload": { "workflowId": "morning-routine" }
+    },
+    "nextRunAt": 1711699200000,
+    "runCount": 0,
+    "createdAt": 1711612800000
+  }
+}
+```
+
+**400 Bad Request** -- Validation errors.
+
+```json
+{
+  "error": "Missing or invalid field: name"
+}
+```
+
+```json
+{
+  "error": "Cron schedule requires an expression field"
+}
+```
+
+**503 Service Unavailable** -- Scheduler not available.
+
+</Accordion>
+
+<Accordion title="DELETE /api/scheduler/tasks/:id">
+
+Cancel a scheduled task by ID.
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The task ID to cancel.
+</ParamField>
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "success": true,
+  "taskId": "task-def456"
+}
+```
+
+**400 Bad Request** -- Invalid ID format.
+
+```json
+{
+  "error": "Invalid task ID format"
+}
+```
+
+**404 Not Found** -- Task does not exist.
+
+```json
+{
+  "error": "Failed to cancel task",
+  "message": "Task not found"
+}
+```
+
+**503 Service Unavailable** -- Scheduler not available.
+
+</Accordion>
+
+## Workflows
+
+<Accordion title="GET /api/workflows">
+
+List all registered workflow definitions.
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "workflows": [
+    {
+      "id": "morning-routine",
+      "name": "Morning Routine",
+      "description": "Plays morning briefing and checks calendar",
+      "stepCount": 3,
+      "steps": [
+        { "id": "step-1", "name": "Check Weather", "type": "ACTION" },
+        { "id": "step-2", "name": "Read Calendar", "type": "ACTION" },
+        { "id": "step-3", "name": "Speak Summary", "type": "ACTION" }
+      ]
+    }
+  ],
+  "count": 1
+}
+```
+
+**503 Service Unavailable** -- Workflow engine not available.
+
+```json
+{
+  "error": "Workflow engine not available"
+}
+```
+
+</Accordion>
+
+<Accordion title="POST /api/workflows/:id/execute">
+
+Trigger execution of a registered workflow.
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The workflow ID to execute.
+</ParamField>
+
+### Request Body (optional)
+
+<ParamField body="input" type="object">
+  Optional input payload for the workflow.
+</ParamField>
+
+```json
+{
+  "input": {
+    "location": "San Francisco",
+    "units": "metric"
+  }
+}
+```
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "execution": {
+    "id": "exec-789",
+    "workflowId": "morning-routine",
+    "state": "completed",
+    "startTime": 1711612800000,
+    "endTime": 1711612802000,
+    "output": { "summary": "Sunny, 72F. No meetings today." },
+    "error": null
+  }
+}
+```
+
+**400 Bad Request** -- Invalid workflow ID or execution failure.
+
+```json
+{
+  "error": "Invalid workflow ID format"
+}
+```
+
+```json
+{
+  "error": "Workflow execution failed",
+  "message": "Step 'Check Weather' timed out"
+}
+```
+
+**404 Not Found** -- Workflow not registered.
+
+```json
+{
+  "error": "Workflow not found",
+  "workflowId": "nonexistent"
+}
+```
+
+**503 Service Unavailable** -- Workflow engine not available.
+
+</Accordion>
+
+## System Info
+
+<Accordion title="GET /api/system/info">
+
+System information including uptime, runtime versions, memory usage, and port configuration.
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "uptime": 3621.45,
+  "nodeVersion": "v22.12.0",
+  "platform": "linux",
+  "arch": "x64",
+  "memoryUsage": {
+    "rss": 85983232,
+    "heapTotal": 42598400,
+    "heapUsed": 38291456,
+    "external": 2845696,
+    "arrayBuffers": 1048576
+  },
+  "ports": {
+    "voice": 3000,
+    "mcp": 4100,
+    "health": 4102
+  },
+  "timestamp": 1711612800000
+}
+```
+
+</Accordion>
+
+## Chat
+
+<Accordion title="POST /api/chat">
+
+Text-based chat endpoint. Routes user text through the agent reasoning loop (model router with tool execution) and returns the response.
+
+### Request Body
+
+<ParamField body="text" type="string" required>
+  The user's message text (must be non-empty).
+</ParamField>
+
+<ParamField body="sessionId" type="string">
+  Session ID for conversation continuity. Omit for stateless.
+</ParamField>
+
+```json
+{
+  "text": "What's the weather like today?",
+  "sessionId": "session-abc123"
+}
+```
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "text": "Based on current conditions, it's sunny and 72 degrees in your area.",
+  "sessionId": "session-abc123",
+  "metadata": {
+    "stepCount": 2,
+    "toolCallCount": 1,
+    "durationMs": 1450
+  }
+}
+```
+
+**400 Bad Request** -- Missing or empty text.
+
+```json
+{
+  "error": "Missing or empty required field: text"
+}
+```
+
+**500 Internal Server Error** -- Chat processing failed.
+
+```json
+{
+  "error": "Chat processing failed",
+  "message": "Model provider timeout"
+}
+```
+
+**503 Service Unavailable** -- Voice pipeline not available.
+
+```json
+{
+  "error": "Voice pipeline not available"
+}
+```
+
+</Accordion>
+
+## Tasks
+
+<Accordion title="POST /api/tasks">
+
+Submit a background agent task. Accepts a topic string, routes it through the agent reasoning loop, and returns the result with a generated task ID.
+
+### Request Body
+
+<ParamField body="topic" type="string" required>
+  The task topic/prompt (must be non-empty).
+</ParamField>
+
+```json
+{
+  "topic": "Summarize the latest news about AI safety"
+}
+```
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "taskId": "550e8400-e29b-41d4-a716-446655440000",
+  "text": "Here is a summary of recent AI safety developments...",
+  "metadata": {
+    "stepCount": 3,
+    "toolCallCount": 2,
+    "durationMs": 4200
+  }
+}
+```
+
+**400 Bad Request** -- Missing or empty topic.
+
+```json
+{
+  "error": "Missing or empty required field: topic"
+}
+```
+
+**500 Internal Server Error** -- Task processing failed.
+
+```json
+{
+  "error": "Task processing failed",
+  "message": "Model provider timeout",
+  "taskId": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+**503 Service Unavailable** -- Voice pipeline not available.
+
+</Accordion>
+
+## Common Error Responses
+
+All endpoints may return the following error shapes:
+
+### 400 Bad Request
+
+Returned when the request is malformed or missing required fields. The `error` field contains a human-readable description.
+
+```json
+{
+  "error": "Invalid JSON body"
+}
+```
+
+### 404 Not Found
+
+Returned when a requested resource (task, workflow) does not exist.
+
+```json
+{
+  "error": "Not found"
+}
+```
+
+### 500 Internal Server Error
+
+Returned when an unexpected exception occurs during request processing.
+
+```json
+{
+  "error": "Internal server error",
+  "message": "Detailed error description"
+}
+```
+
+### 503 Service Unavailable
+
+Returned when a required dependency (Redis, voice pipeline, memory system, scheduler, workflow engine) is not initialized or has failed.
+
+```json
+{
+  "error": "Component not available"
+}
+```
+
+## Notes
+
+<Note>
+**Body size limit**: Request bodies are capped at 1 MB. Requests exceeding this limit receive no response (connection closed).
+</Note>
+
+- **ID validation**: Path parameter IDs (task IDs, workflow IDs) must match `^[a-zA-Z0-9\-_]+$` and be 1--128 characters. Invalid IDs return 400.
+- **CORS**: Configurable via `CORS_ORIGIN` environment variable (default: `*`). Preflight `OPTIONS` requests return 204.
+- **Metrics**: All API requests are tracked in the internal metrics system. Latency is recorded per route.
+- **Authentication**: See [Authentication](#authentication) below for opt-in API key auth.
+- **Rate Limiting**: See [Rate Limiting](#rate-limiting) below for per-endpoint limits.
+
+## Authentication
+
+API key authentication is **opt-in**. When the `AGTOS_API_KEY` environment variable is set, all `/api/*` endpoints require a valid Bearer token.
+
+### Headers
+
+| Header | Value | Required |
+|--------|-------|----------|
+| `Authorization` | `Bearer <your-api-key>` | When `AGTOS_API_KEY` is set |
+
+### Response (401 Unauthorized)
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Valid API key required. Set Authorization: Bearer <key> header."
+}
+```
+
+### Exempt Paths
+
+These paths do **not** require authentication:
+
+- `GET /health` (and sub-paths)
+- `GET /metrics`
+
+## Rate Limiting
+
+All API endpoints are rate-limited using a token bucket algorithm.
+
+### Default Limits
+
+| Scope | Limit | Configurable Via |
+|-------|-------|-----------------|
+| General API (`/api/*`) | 100 requests/min | `API_RATE_LIMIT` |
+| Chat + Tasks (`/api/chat`, `/api/tasks`) | 20 requests/min | `CHAT_RATE_LIMIT` |
+
+### Rate Limit Headers
+
+Included on all API responses:
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Remaining` | Tokens remaining in current window |
+
+Included on `429 Too Many Requests` responses:
+
+| Header | Description |
+|--------|-------------|
+| `Retry-After` | Seconds until rate limit resets |
+| `X-RateLimit-Limit` | Maximum requests per window |
+| `X-RateLimit-Remaining` | Always `0` on rate-limited responses |
+| `X-RateLimit-Reset` | Seconds until rate limit resets |
+
+### 429 Response Body
+
+```json
+{
+  "error": "Too many requests",
+  "retryAfter": 60
+}
+```

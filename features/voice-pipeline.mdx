@@ -1,8 +1,245 @@
 ---
-title: "voice pipeline"
-description: "Documentation for voice pipeline"
+title: "Voice Pipeline"
+description: "Real-time voice processing with VAD, STT, LLM, and TTS — supporting cascade, half-cascade, and native audio architectures"
 ---
 
-# voice pipeline
+agtOS provides a full voice pipeline that converts speech to text, processes it through an LLM, and synthesizes a spoken response. The pipeline supports three distinct audio architectures, each with different latency, cost, and quality trade-offs.
 
-<Info>This page is being written. Check back soon or contribute at [github.com/agtos-ai/docs](https://github.com/agtos-ai/docs).</Info>
+## Architecture Overview
+
+The voice pipeline follows agtOS's dual-layer design:
+
+- **Infrastructure Layer** handles the technical audio pipeline: VAD, encoding/decoding, transport, and buffering.
+- **Orchestration Layer** drives AI decisions: process speech, call tools, generate responses. The orchestration layer does not know or care which audio architecture is active.
+
+This separation means switching between audio modes is a configuration change, not an architectural change.
+
+```
+Audio In → [VAD] → [STT] → [LLM + Tools] → [TTS] → Audio Out
+              │         │          │              │
+              └─ Infrastructure Layer ─────────────┘
+                         │
+              ┌─ Orchestration Layer ──┐
+              │  "User said X"         │
+              │  "Respond with Y"      │
+              │  "Call tool Z"         │
+              └────────────────────────┘
+```
+
+## Audio Modes
+
+agtOS supports three audio processing architectures. The default is **cascade**, which provides the most flexibility and lowest cost.
+
+<CardGroup cols={3}>
+  <Card title="Cascade" icon="layer-group">
+    **STT → LLM → TTS**
+
+    Each component is independent and swappable. Best for development, low-cost operation, and maximum flexibility.
+
+    ~500ms latency | ~$0.15/min
+  </Card>
+  <Card title="Half-Cascade" icon="bolt">
+    **Audio LLM → TTS**
+
+    The LLM processes audio tokens directly, eliminating the STT step. Preserves tone and emphasis.
+
+    ~200-300ms latency | Lower than cascade
+  </Card>
+  <Card title="Native Audio" icon="waveform-lines">
+    **End-to-end model**
+
+    No separate STT or TTS. The model handles audio input and output natively. Most natural-sounding.
+
+    ~200-300ms latency | ~$1.50/min
+  </Card>
+</CardGroup>
+
+### Cascade (Default)
+
+The cascade architecture processes audio through discrete stages:
+
+1. **VAD** (Silero) filters silence and noise locally before sending to the server
+2. **STT** (speaches/Whisper) transcribes speech to text
+3. **LLM** (Claude or Ollama) generates a text response, optionally calling tools
+4. **TTS** (speaches/Kokoro) synthesizes the response as audio
+
+Each component can be swapped independently. For example, you can use a local Ollama model for the LLM while keeping speaches for STT and TTS.
+
+### Half-Cascade
+
+The half-cascade architecture eliminates the STT step by using an audio-understanding LLM (such as Ultravox) that processes audio tokens directly. TTS remains separate.
+
+This preserves paralinguistic cues (tone, emphasis, hesitation) that text transcription loses.
+
+### Native Audio
+
+Native audio models like GPT-4o Realtime and Gemini Live handle the entire audio pipeline end-to-end. No separate STT or TTS. The model directly produces speech output with natural intonation, laughter, and emotional tone.
+
+<Warning>
+Native audio models are currently the most expensive option (~$1.50/min, roughly 10x cascade). Costs are dropping rapidly, but this mode is best suited for scenarios where latency and naturalness matter more than cost.
+</Warning>
+
+## STT (Speech-to-Text)
+
+STT is provided by [speaches](https://github.com/speaches-ai/speaches), an open-source server that exposes an OpenAI-compatible `/v1/audio/transcriptions` endpoint. agtOS connects using the standard OpenAI Node.js SDK.
+
+Key capabilities:
+
+- **GPU-accelerated** inference via CUDA/ROCm (4-6x faster than CPU)
+- **Multiple models**: Whisper large-v3, faster-whisper, distil-whisper
+- **No file I/O**: Audio is streamed over HTTP -- no temp files anywhere in the pipeline
+- **Streaming transcription**: Progressive results while the user is still speaking
+- **Shared with TTS**: The same speaches container handles both STT and TTS
+
+```typescript
+// Under the hood, agtOS uses the OpenAI SDK pointed at speaches
+const client = new OpenAI({
+  baseURL: 'http://speaches:8000/v1',
+  apiKey: 'not-needed'
+});
+
+const transcription = await client.audio.transcriptions.create({
+  model: 'whisper-large-v3',
+  file: audioBuffer,
+});
+```
+
+### VAD Pre-Filtering
+
+Voice Activity Detection runs locally (in the Node.js process or on the ESP32 device) before sending audio to the STT server. This prevents transcribing silence and background noise:
+
+- **Silero VAD**: ONNX model (~2MB), classifies 30ms audio frames in <1ms
+- **ESP32 VAD**: Energy-based on-device detection for hardware clients
+- A 200ms pre-buffer is included before the VAD trigger to avoid clipping the start of speech
+
+## TTS (Text-to-Speech)
+
+TTS is also provided by speaches, using the OpenAI-compatible `/v1/audio/speech` endpoint. The default engine is **Kokoro**, which provides a good balance of quality, speed, and resource usage.
+
+Key capabilities:
+
+- **Sentence-based streaming**: TTS begins on the first complete sentence while the LLM is still generating subsequent sentences, reducing perceived latency
+- **Multiple engines**: Kokoro (default), XTTS v2 (voice cloning), Piper (legacy)
+- **Multiple formats**: Opus (WebRTC streaming), PCM (local processing), MP3, WAV, FLAC
+- **GPU acceleration**: Dramatically lower latency than CPU-only inference
+
+```typescript
+const speech = await client.audio.speech.create({
+  model: 'kokoro',
+  voice: 'af_heart',
+  input: 'Hello! How can I help you today?',
+});
+```
+
+### Stream Coordinator
+
+The Stream Coordinator is the core integration point for low-latency voice responses. It manages:
+
+1. **LLM token accumulation** as the model streams its response
+2. **Sentence boundary detection** to identify complete sentences
+3. **TTS dispatch queue** to synthesize sentences as they arrive
+4. **Audio chunk ordering** to ensure correct playback sequence
+5. **Interruption handling** for barge-in (user speaks while agent is responding)
+
+This approach means TTS synthesis starts on the first sentence while the LLM is still generating the rest of the response, achieving sub-second perceived latency.
+
+## Transport
+
+### WebSocket Audio Streaming
+
+The primary transport for real-time audio is WebSocket, served on port 3000. Clients connect and stream raw audio frames, receiving synthesized audio in return.
+
+The WebSocket transport supports:
+
+- **PTT (Push-to-Talk)**: Client explicitly signals start/stop of speech
+- **VAD mode**: Server-side voice activity detection determines speech boundaries
+- **Authentication**: Optional token validation on WebSocket upgrade
+- **Session management**: Each connection gets a voice session with conversation context
+
+<Info>
+WebRTC signaling is also available for browser-to-browser audio, but WebSocket is the primary transport for the MVP.
+</Info>
+
+### Browser Voice Client
+
+The built-in web dashboard includes a voice client that connects via WebSocket with AudioWorklet-based capture (ScriptProcessorNode fallback for older browsers). It supports both PTT and VAD modes with real-time transcript display.
+
+## Configuration
+
+Configure the voice pipeline through environment variables:
+
+```bash
+# Voice server port
+VOICE_PORT=3000
+
+# STT settings
+AGTOS_STT_MODEL=whisper-large-v3
+SPEACHES_URL=http://localhost:8000
+
+# TTS settings
+AGTOS_TTS_VOICE=af_heart
+
+# Audio mode (cascade | half_cascade | native)
+AGTOS_VOICE_VARIANT=cascade
+```
+
+### Pipeline Configuration Object
+
+When initializing the orchestrator programmatically:
+
+```typescript
+const orchestrator = new VoicePipelineOrchestrator({
+  webrtc: {
+    signalingPort: 3000,
+  },
+  stt: {
+    provider: 'speaches',
+    model: 'whisper-large-v3',
+  },
+  tts: {
+    provider: 'speaches',
+    voice: 'af_heart',
+  },
+  command: {
+    provider: 'claude',  // or 'ollama'
+  },
+  redisUrl: 'redis://localhost:6379',
+});
+```
+
+<Accordion title="Routing rules for audio modes">
+The voice pipeline supports conditional routing between audio modes based on user preferences or operational constraints:
+
+```yaml
+voice:
+  default_variant: cascade
+  variants:
+    cascade:
+      stt: speaches
+      llm: claude-haiku-4.5
+      tts: speaches
+    half_cascade:
+      audio_llm: ultravox
+      tts: speaches
+    native:
+      provider: gemini-live
+      model: gemini-2.5-flash
+  routing:
+    rules:
+      - condition: "user.preference == 'natural'"
+        variant: native
+      - condition: "cost_budget < 0.50/hour"
+        variant: cascade
+      - condition: "emotion_detection_required"
+        variant: half_cascade
+```
+</Accordion>
+
+## Graceful Degradation
+
+The voice pipeline degrades gracefully when components are unavailable:
+
+- If a native audio API is down, fall back to cascade
+- If the local STT/TTS server is down, fall back to cloud providers
+- If Redis is unavailable, voice sessions still work (without memory persistence)
+- Health checks for each component (STT, TTS, Ollama, Claude) are exposed via the `/api/health` endpoint
