@@ -1,33 +1,36 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: "API Overview"
+description: "agtOS exposes three protocol interfaces"
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+# API Reference
 
-## Welcome
+agtOS provides three ways to interact with the platform:
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
-
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+| Protocol | Port | Use Case |
+|----------|------|----------|
+| **REST API** | 4102 | Dashboard, CLI, health checks, chat |
+| **WebSocket** | 3000 | Real-time voice audio streaming |
+| **MCP** | 4100 | Tool integration for AI agents |
 
 ## Authentication
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+API endpoints support optional authentication via `AGTOS_API_KEY`:
 
-```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+```bash
+curl -H "Authorization: Bearer your-api-key" http://localhost:4102/api/health
 ```
+
+When `AGTOS_API_KEY` is not set, all endpoints are open (local development mode).
+
+<CardGroup cols={3}>
+  <Card title="REST Endpoints" icon="server" href="/api-reference/http-endpoints">
+    13+ HTTP endpoints for health, chat, sessions, memory, scheduling
+  </Card>
+  <Card title="WebSocket" icon="wave-sine" href="/api-reference/websocket">
+    Real-time audio streaming with push-to-talk and VAD
+  </Card>
+  <Card title="MCP Tools" icon="wrench" href="/api-reference/mcp-tools">
+    9 tools: voice, system health, sessions, workflows, scheduling
+  </Card>
+</CardGroup>
