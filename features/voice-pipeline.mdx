@@ -1,6 +1,6 @@
 ---
 title: "Voice Pipeline"
-description: "Real-time voice processing with VAD, STT, LLM, and TTS — supporting cascade, half-cascade, and native audio architectures"
+description: "Real-time voice processing with in-process or server-based STT/TTS, supporting cascade, half-cascade, and native audio architectures"
 ---
 
 agtOS provides a full voice pipeline that converts speech to text, processes it through an LLM, and synthesizes a spoken response. The pipeline supports three distinct audio architectures, each with different latency, cost, and quality trade-offs.
@@ -78,6 +78,73 @@ Native audio models like GPT-4o Realtime and Gemini Live handle the entire audio
 <Warning>
 Native audio models are currently the most expensive option (~$1.50/min, roughly 10x cascade). Costs are dropping rapidly, but this mode is best suited for scenarios where latency and naturalness matter more than cost.
 </Warning>
+
+## In-Process Speech Engine (sherpa-onnx)
+
+agtOS can run STT, TTS, and VAD entirely in-process using [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), eliminating the need for an external speaches server. This is configured via environment variables and falls back to speaches automatically if models are not available.
+
+<CardGroup cols={2}>
+  <Card title="In-Process (sherpa-onnx)" icon="microchip">
+    **STT + TTS + VAD in Node.js**
+
+    No Python sidecar. 17+ STT models, 7 TTS families, Silero VAD. True streaming STT with real-time partial results.
+  </Card>
+  <Card title="External Server (speaches)" icon="server">
+    **OpenAI-compatible HTTP server**
+
+    Separate Docker container running faster-whisper + Kokoro. Original architecture, still fully supported.
+  </Card>
+</CardGroup>
+
+### Switching Providers
+
+```bash
+# Use in-process sherpa-onnx (no external server needed)
+STT_PROVIDER=sherpa-onnx
+TTS_PROVIDER=sherpa-onnx
+
+# Use external speaches server (default)
+STT_PROVIDER=speaches
+TTS_PROVIDER=speaches
+```
+
+### Model Management
+
+Download models before first use:
+
+```bash
+# Download the default model set (~460MB)
+npx agtos models download --default
+
+# List available models
+npx agtos models list
+
+# Download a specific model
+npx agtos models download sensevoice-int8
+```
+
+### Available STT Models
+
+| Model | Size | Languages | Streaming | Best For |
+|-------|------|-----------|-----------|----------|
+| Moonshine Tiny EN (default) | 102MB | English | No | Fast English transcription |
+| SenseVoice INT8 | 155MB | zh, en, ja, ko | No | Multilingual, quality |
+| Zipformer Streaming EN | 121MB | English | Yes | Real-time partial results |
+
+### True Streaming STT
+
+When the Zipformer streaming model is available, agtOS provides real-time partial transcription results while the user is still speaking. The orchestrator automatically detects streaming capability and feeds audio chunks to the recognizer incrementally.
+
+```
+User speaking: "What's the wea..."  → partial: "What's the wea"
+User speaking: "What's the weather"  → partial: "What's the weather"
+User stops speaking                  → final: "What's the weather like today?"
+                                     → triggers LLM processing
+```
+
+<Info>
+If the streaming model is not downloaded, agtOS falls back to batch transcription (accumulate audio, transcribe on speech end). Both paths produce the same final result — streaming just provides earlier feedback.
+</Info>
 
 ## STT (Speech-to-Text)
 

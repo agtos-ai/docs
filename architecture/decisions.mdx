@@ -1,6 +1,6 @@
 ---
 title: "Architecture Decision Records"
-description: "16 ADRs documenting every significant architectural choice in agtOS"
+description: "17 ADRs documenting every significant architectural choice in agtOS"
 ---
 
 Architecture Decision Records (ADRs) capture significant architectural decisions made during the development of agtOS. Each ADR describes a single decision, its context, the rationale behind it, and the consequences of adopting it.
@@ -36,9 +36,10 @@ ADRs are **immutable once accepted**. If a decision is reversed or significantly
 | 014 | API Security | Accepted | 2026-03-28 | Opt-in Bearer token auth, token bucket rate limiting, Zod input validation on all POST endpoints. |
 | 015 | Platform-Aware Adapter Routing | Accepted | 2026-03-29 | Platform-specific adapter overrides in the gateway. Tools can be restricted to specific platforms. Backward compatible. |
 | 016 | Desktop Client Framework | Accepted | 2026-03-29 | Tauri 2 for native desktop. System tray, global PTT hotkey, health monitor. Node SEA sidecar for backend. |
+| 017 | sherpa-onnx In-Process Speech Engine | Accepted | 2026-03-31 | Replace speaches Python sidecar with sherpa-onnx-node for in-process STT, TTS, and VAD via ONNX Runtime. |
 
 <Info>
-The first 10 ADRs (001-010) were created together on 2026-03-22 to document decisions made upon resuming development after the 7-month hiatus. ADRs 011-016 were created individually as decisions arose during active development.
+The first 10 ADRs (001-010) were created together on 2026-03-22 to document decisions made upon resuming development after the 7-month hiatus. ADRs 011-017 were created individually as decisions arose during active development.
 </Info>
 
 ## Key Architectural Principles
@@ -113,6 +114,14 @@ BYOK credential management (ADR-011) encrypts keys at rest. API security (ADR-01
 **Decision**: Intent-to-category mapping with top-N tool selection. The intent classifier determines which tool categories are relevant, and only those tools are loaded into context. Achieves 80-90% context reduction.
 
 **Trade-off**: If the classifier picks the wrong category, the needed tool is not available. Mitigation: always include a "general" fallback category.
+</Accordion>
+
+<Accordion title="ADR-017: sherpa-onnx In-Process Speech Engine">
+**Problem**: agtOS depended on speaches, a Python-based STT/TTS server with a single maintainer who disappears for months. Critical bugs (transcription hallucination, silence crash) sat unmerged for 39-67+ days. The v0.9.0 release was stuck in RC for 6+ months. Every STT/TTS call required a cross-process HTTP round-trip to the Python sidecar.
+
+**Decision**: Replace speaches with sherpa-onnx-node (v1.12.34), a pre-compiled N-API native addon that runs STT, TTS, and VAD directly in the Node.js process via ONNX Runtime. This brings 17+ STT models (Whisper, Moonshine, SenseVoice, Zipformer, Paraformer), 7 TTS families (Kokoro, Piper, Matcha, ZipVoice), and Silero VAD into a single process. GPU acceleration is available via CUDA (Linux), CoreML (macOS), and DirectML (Windows). speaches is preserved as a config-switchable fallback.
+
+**Trade-off**: Whisper uses greedy decoding only (no beam search), model files require ~460MB local storage, and TypeScript type declarations (~300 lines) must be maintained manually. But the elimination of the Python sidecar, HTTP overhead, and single-maintainer dependency risk far outweighs these costs.
 </Accordion>
 
 ## Proposing a New ADR

@@ -14,7 +14,7 @@ The infrastructure layer handles the technical audio pipeline and connectivity:
 - **Voice Activity Detection (VAD)** -- detects when the user is speaking
 - **Audio encoding/decoding** -- PCM, Opus, WAV format conversion
 - **Transport** -- WebSocket audio streaming, WebRTC signaling
-- **STT/TTS** -- speech-to-text and text-to-speech via speaches server
+- **STT/TTS** -- speech-to-text and text-to-speech via speaches server or sherpa-onnx in-process engine ([ADR-017](/architecture/decisions#adr-017))
 - **Session management** -- Redis-backed session state with TTL and device indexing
 
 This layer is analogous to TCP/IP -- it provides reliable audio transport and processing that higher layers build on.
@@ -40,7 +40,7 @@ agtOS supports three voice pipeline architectures through the infrastructure lay
 ### CASCADE (Default)
 
 ```
-Audio In -> VAD -> STT (speaches) -> LLM (Claude/Ollama) -> TTS (speaches) -> Audio Out
+Audio In -> VAD -> STT (sherpa-onnx/speaches) -> LLM (Claude/Ollama) -> TTS (sherpa-onnx/speaches) -> Audio Out
 ```
 
 Each component is independently swappable. The default for development, low-cost operation, and maximum flexibility. Latency: ~500ms total.
@@ -48,7 +48,7 @@ Each component is independently swappable. The default for development, low-cost
 ### HALF_CASCADE
 
 ```
-Audio In -> VAD -> Audio LLM (Ultravox) -> TTS (speaches) -> Audio Out
+Audio In -> VAD -> Audio LLM (Ultravox) -> TTS (sherpa-onnx/speaches) -> Audio Out
 ```
 
 The LLM directly processes audio tokens, eliminating the STT step. Preserves tone, emphasis, and paralinguistic cues. Latency: ~200-300ms.
@@ -106,7 +106,7 @@ Here is the complete flow for a voice interaction using the cascade pipeline:
     User speaks into microphone (browser WebSocket or ESP32 hardware). Audio frames stream to the voice server on port 3000.
   </Step>
   <Step title="Speech-to-Text">
-    The STT provider (speaches, Faster Whisper model) transcribes the audio stream into text.
+    The STT provider transcribes the audio stream into text. Default is sherpa-onnx (Moonshine/SenseVoice models, in-process); speaches (Faster Whisper, sidecar) is available as a fallback.
   </Step>
   <Step title="Intent Classification">
     The model router's Tier 1 classifier (Ollama, qwen3:1.7b) categorizes the request in under 50ms: simple query, tool use, complex reasoning, creative, or system command.
@@ -121,7 +121,7 @@ Here is the complete flow for a voice interaction using the cascade pipeline:
     The LLM response streams token-by-token. Sentence boundary detection splits the stream for TTS chunking -- the first sentence starts synthesizing while later sentences are still generating.
   </Step>
   <Step title="Text-to-Speech">
-    The TTS provider (speaches, Kokoro model) synthesizes each sentence into audio.
+    The TTS provider synthesizes each sentence into audio. Default is sherpa-onnx (Kokoro ONNX, in-process); speaches (Kokoro, sidecar) is available as a fallback.
   </Step>
   <Step title="Audio Playback">
     Synthesized audio streams back to the client over WebSocket. The user hears the response as it generates.
@@ -158,8 +158,8 @@ Here is the complete flow for a voice interaction using the cascade pipeline:
 | **Runtime** | Node.js 20+ / TypeScript | Server, CLI, all business logic |
 | **Cloud LLM** | Claude (Anthropic SDK) | Complex reasoning, agentic tasks |
 | **Local LLM** | Ollama (Qwen3, etc.) | Intent classification, simple queries |
-| **STT** | speaches (Faster Whisper) | Speech-to-text transcription |
-| **TTS** | speaches (Kokoro ONNX) | Text-to-speech synthesis |
+| **STT** | sherpa-onnx (Moonshine/SenseVoice) or speaches (Faster Whisper) | Speech-to-text transcription |
+| **TTS** | sherpa-onnx (Kokoro ONNX) or speaches (Kokoro) | Text-to-speech synthesis |
 | **State** | Redis (node-redis v5) | Sessions, memory, scheduler, events, devices |
 | **Protocols** | MCP (Streamable HTTP) | Tool integration, external server connections |
 | **Desktop** | Tauri 2 | Native app shell with system tray, hotkeys |
@@ -204,10 +204,12 @@ All POST endpoints validate input with Zod schemas and enforce a 10KB text limit
               |  :4102  API     |
               +--------+--------+
               |        |        |
-        +-----+   +---+---+   +-----+
-        |Redis |   |Ollama |   |speaches|
-        |:6379 |   |:11434 |   |:8000   |
-        +------+   +-------+   +--------+
+        +-----+   +---+---+   +-----------+
+        |Redis |   |Ollama |   |sherpa-onnx|
+        |:6379 |   |:11434 |   |(in-process)|
+        +------+   +-------+   +-----------+
 ```
+
+sherpa-onnx runs in-process (no separate port). If using the speaches fallback, it runs as a sidecar on port 8000.
 
 All services can run on a single machine for development, or be distributed across hosts in production. The desktop app (Tauri) connects to the same ports via localhost.

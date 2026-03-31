@@ -1,9 +1,9 @@
 ---
 title: "Provider Configuration"
-description: "Configure Claude, Ollama, speaches STT/TTS, and the model router"
+description: "Configure Claude, Ollama, sherpa-onnx, speaches, and the model router"
 ---
 
-agtOS uses a multi-provider architecture. Claude handles complex reasoning in the cloud, Ollama runs local models for fast responses and privacy, and speaches provides speech-to-text and text-to-speech. The model router ties them together, sending each request to the optimal provider.
+agtOS uses a multi-provider architecture. Claude handles complex reasoning in the cloud, Ollama runs local models for fast responses and privacy, and speech processing runs either in-process via sherpa-onnx or via an external speaches server. The model router ties them together.
 
 ## Claude Provider
 
@@ -162,6 +162,53 @@ SPEACHES_TTS_VOICE=af_heart
 speaches does not support `opus` or `aac` audio formats. Use `wav` (default) or `mp3`.
 </Note>
 
+## sherpa-onnx Provider
+
+sherpa-onnx runs STT, TTS, and VAD directly in the Node.js process via a native ONNX Runtime addon. No Python, no external server, no HTTP round-trips. See [ADR-017](/architecture/decisions#adr-017) for the decision rationale.
+
+### Why sherpa-onnx?
+
+- **In-process**: No network latency for STT/TTS calls
+- **17+ STT models**: Whisper, Moonshine, SenseVoice, Zipformer, Paraformer
+- **True streaming STT**: Partial results while the user is still speaking
+- **Voice cloning**: PocketTTS and ZipVoice support (future)
+- **Apple Silicon**: CoreML acceleration on macOS
+
+### Configuration
+
+```bash
+# Enable sherpa-onnx (replaces speaches)
+STT_PROVIDER=sherpa-onnx
+TTS_PROVIDER=sherpa-onnx
+
+# Model selection
+SHERPA_STT_MODEL=moonshine-tiny-en-int8    # Fast English (default)
+SHERPA_TTS_MODEL=kokoro-int8-multi-v1      # Kokoro TTS (default)
+SHERPA_TTS_VOICE=af_heart                  # Default voice
+
+# Performance tuning
+SHERPA_STT_NUM_THREADS=4
+SHERPA_TTS_NUM_THREADS=2
+SHERPA_TTS_POOL_SIZE=3                     # Concurrent TTS instances
+```
+
+### Model Router
+
+The STT model router automatically selects the best model based on context:
+
+| Context | Selected Model | Reason |
+|---------|---------------|--------|
+| English, fast mode | Moonshine Tiny | Lowest latency |
+| Non-English | SenseVoice INT8 | Multilingual support |
+| Streaming requested | Zipformer EN 20M | Real-time partial results |
+| Quality mode | SenseVoice INT8 | Best accuracy |
+
+The router is consulted automatically when the configured model is not available.
+
+<Note>
+sherpa-onnx requires downloading ONNX model files (~460MB for the default set). Run `npx agtos models download --default` before first use. Models are cached locally in `~/.agtos/models/`.
+</Note>
+
 ## Model Router
 
 The model router implements [ADR-004](/architecture/decisions#adr-004) -- a three-tier routing architecture that sends each request to the optimal inference tier.
@@ -260,7 +307,10 @@ COMMAND_PROVIDER=ollama
   <Card title="Ollama (Local)" icon="server">
     Simple queries, privacy-sensitive requests, intent classification. Qwen3 models via local GPU.
   </Card>
-  <Card title="speaches (Voice)" icon="microphone">
+  <Card title="sherpa-onnx (In-Process)" icon="microchip">
+    In-process STT, TTS, and VAD via ONNX Runtime. No external server. 17+ STT models, true streaming.
+  </Card>
+  <Card title="speaches (External)" icon="microphone">
     Self-hosted STT (Faster Whisper) and TTS (Kokoro). OpenAI-compatible API on port 8000.
   </Card>
   <Card title="Model Router" icon="route">
