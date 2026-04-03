@@ -190,6 +190,15 @@ This means agtOS works on a fresh install with no Redis and no Ollama. As you ad
 |--------|----------|-------------|
 | `GET` | `/api/memory/episodes` | List recent episodic memories |
 | `GET` | `/api/memory/search?q=...` | Semantic + keyword search across episodes |
+| `GET` | `/api/memory/profile` | Get user profile (name, preferences, patterns) |
+| `PUT` | `/api/memory/profile` | Update user profile fields |
+| `GET` | `/api/memory/conclusions` | Get dialectic reasoning conclusions |
+| `DELETE` | `/api/memory/conclusions/:id` | Delete a specific conclusion |
+| `POST` | `/api/memory/ask` | Ask a question about the user (RAG via Dialectic engine) |
+| `GET` | `/api/memory/sources` | Scan for importable external AI tool memories |
+| `POST` | `/api/memory/import` | Import memories from external AI tools |
+
+See [HTTP Endpoints](/api-reference/http-endpoints) for complete request/response documentation.
 
 ### Query Parameters
 
@@ -205,6 +214,39 @@ This means agtOS works on a fresh install with no Redis and no Ollama. As you ad
 |-----------|------|---------|-------------|
 | `q` | string | -- | Required. Search query text |
 | `limit` | number | `10` | Max results (1-50) |
+
+### User Profile
+
+The memory system builds a user profile from conversation history, tracking the user's name, communication style, behavioral patterns, and preferences. The profile is used to personalize agent responses.
+
+### Dialectic Engine
+
+The Dialectic engine answers questions about the user by synthesizing information from the profile, conclusions, and episodic memories. Use `POST /api/memory/ask` to query it:
+
+```bash
+curl -X POST http://localhost:4102/api/memory/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What are this user'\''s preferred communication channels?"}'
+```
+
+### Cross-Tool Memory Import
+
+agtOS can import memories from other AI tools (Claude, ChatGPT, etc.) via the import pipeline. The CLI provides a convenient interface:
+
+```bash
+# Scan for available sources
+npx agtos memory import
+```
+
+Or use the API directly:
+
+```bash
+# Scan available sources
+curl http://localhost:4102/api/memory/sources
+
+# Import from all sources
+curl -X POST http://localhost:4102/api/memory/import
+```
 
 ## Configuration
 

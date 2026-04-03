@@ -669,6 +669,922 @@ Submit a background agent task. Accepts a topic string, routes it through the ag
 
 </Accordion>
 
+## Voice Stats
+
+<Accordion title="GET /api/voice/stats">
+
+Audio quality metrics including STT/TTS latency percentiles, audio chunk counts, and active session count. Returns zeroed stats when no data has been collected yet.
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "stt": { "p50": 120, "p95": 300, "p99": 500, "count": 42 },
+  "tts": { "p50": 80, "p95": 200, "p99": 400, "count": 38 },
+  "audioChunksIn": 1200,
+  "audioChunksOut": 950,
+  "requestsPerMinute": 15,
+  "activeSessions": 2,
+  "timestamp": 1711612800000
+}
+```
+
+</Accordion>
+
+## Memory Profile
+
+<Accordion title="GET /api/memory/profile">
+
+Retrieve the user profile built from conversation history (name, communication style, patterns, preferences).
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "profile": {
+    "name": "Alex",
+    "communicationStyle": "concise, technical",
+    "patterns": ["prefers metric units", "morning person"],
+    "preferences": { "units": "metric", "language": "en" }
+  }
+}
+```
+
+**503 Service Unavailable** -- Memory coordinator not available.
+
+</Accordion>
+
+<Accordion title="PUT /api/memory/profile">
+
+Update user profile fields.
+
+### Request Body
+
+```json
+{
+  "name": "Alex",
+  "communicationStyle": "concise, technical",
+  "patterns": ["prefers metric units"],
+  "preferences": { "units": "metric" }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | No | User display name (max 200 chars) |
+| `communicationStyle` | string | No | Description of communication preferences (max 500 chars) |
+| `patterns` | string[] | No | Behavioral patterns (max 50 items, 500 chars each) |
+| `preferences` | object | No | Key-value preference pairs (string values, max 500 chars) |
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "updated": true
+}
+```
+
+**400 Bad Request** -- Validation failure.
+
+**503 Service Unavailable** -- Memory coordinator not available.
+
+</Accordion>
+
+## Memory Conclusions
+
+<Accordion title="GET /api/memory/conclusions">
+
+Retrieve conclusions drawn from conversation history by the Dialectic reasoning engine.
+
+### Query Parameters
+
+<ParamField query="type" type="string">
+  Filter by conclusion type: `explicit`, `inferred`, `corrected`.
+</ParamField>
+
+<ParamField query="minConfidence" type="number">
+  Minimum confidence threshold (0.0--1.0).
+</ParamField>
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "conclusions": [
+    {
+      "id": "conc-abc123",
+      "text": "User prefers morning meetings",
+      "type": "inferred",
+      "confidence": 0.85,
+      "sources": ["ep-001", "ep-003"]
+    }
+  ]
+}
+```
+
+**503 Service Unavailable** -- Memory coordinator not available.
+
+</Accordion>
+
+<Accordion title="DELETE /api/memory/conclusions/:id">
+
+Delete a specific conclusion by ID.
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The conclusion ID to delete.
+</ParamField>
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "deleted": true,
+  "conclusionId": "conc-abc123"
+}
+```
+
+**503 Service Unavailable** -- Memory coordinator not available.
+
+</Accordion>
+
+## Memory Ask (Dialectic)
+
+<Accordion title="POST /api/memory/ask">
+
+Ask a question about the user via the Dialectic reasoning engine. Gathers profile, conclusions, and episodes to synthesize an answer.
+
+### Request Body
+
+<ParamField body="question" type="string" required>
+  The question to ask about the user (max 2,000 characters).
+</ParamField>
+
+<ParamField body="userId" type="string">
+  Optional user ID scope.
+</ParamField>
+
+```json
+{
+  "question": "What are this user's preferred communication channels?"
+}
+```
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "answer": "Based on conversation history, the user prefers Slack for quick questions and email for detailed discussions.",
+  "confidence": 0.78,
+  "sources": ["ep-abc123", "ep-def456"]
+}
+```
+
+**400 Bad Request** -- Missing or invalid question.
+
+**503 Service Unavailable** -- Memory coordinator not available.
+
+</Accordion>
+
+## Memory Import
+
+<Accordion title="GET /api/memory/sources">
+
+Scan for available external AI tool memory sources (Claude, ChatGPT, etc.) that can be imported into agtOS.
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "sources": [
+    {
+      "name": "claude",
+      "available": true,
+      "memoryCount": 42,
+      "path": "~/.claude/memory"
+    }
+  ]
+}
+```
+
+**503 Service Unavailable** -- Memory coordinator not available.
+
+</Accordion>
+
+<Accordion title="POST /api/memory/import">
+
+Import memories from external AI tool sources into the agtOS memory system.
+
+### Request Body
+
+<ParamField body="sources" type="string[]">
+  Optional list of source names to import from. If omitted, imports from all available sources.
+</ParamField>
+
+```json
+{
+  "sources": ["claude"]
+}
+```
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "imported": 35,
+  "skipped": 7,
+  "errors": 0,
+  "message": "Imported 35 memories from claude"
+}
+```
+
+**503 Service Unavailable** -- Memory coordinator not available.
+
+</Accordion>
+
+## Devices
+
+<Accordion title="POST /api/devices/register">
+
+Register a new device (ESP32, browser, CLI, MCP client, or custom).
+
+### Request Body
+
+<ParamField body="name" type="string" required>
+  Device display name (max 200 chars).
+</ParamField>
+
+<ParamField body="deviceType" type="string" required>
+  One of: `esp32`, `browser`, `cli`, `mcp-client`, `custom`.
+</ParamField>
+
+<ParamField body="platform" type="string" required>
+  Platform identifier (max 100 chars).
+</ParamField>
+
+<ParamField body="capabilities" type="object" required>
+  Device capability flags: `audio`, `microphone`, `speaker`, `display`, `buttons`, `sensors` (all boolean).
+</ParamField>
+
+<ParamField body="secret" type="string">
+  Optional shared secret for device authentication (8--256 chars). Hashed with SHA-256.
+</ParamField>
+
+<ParamField body="firmwareVersion" type="string">
+  Firmware version string (max 50 chars).
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Arbitrary key-value metadata.
+</ParamField>
+
+```json
+{
+  "name": "Kitchen Speaker",
+  "deviceType": "esp32",
+  "platform": "esp32-s3",
+  "capabilities": {
+    "audio": true,
+    "microphone": true,
+    "speaker": true,
+    "display": false,
+    "buttons": false,
+    "sensors": false
+  },
+  "secret": "my-device-secret",
+  "firmwareVersion": "1.2.0"
+}
+```
+
+### Response
+
+**201 Created**
+
+```json
+{
+  "device": {
+    "id": "dev-abc123",
+    "name": "Kitchen Speaker",
+    "deviceType": "esp32",
+    "platform": "esp32-s3",
+    "status": "pending",
+    "trustLevel": 2,
+    "capabilities": { "audio": true, "microphone": true, "speaker": true, "display": false, "buttons": false, "sensors": false },
+    "firmwareVersion": "1.2.0"
+  }
+}
+```
+
+**409 Conflict** -- Device already registered.
+
+**503 Service Unavailable** -- Device registry not available (Redis down).
+
+</Accordion>
+
+<Accordion title="GET /api/devices">
+
+List registered devices with optional filters.
+
+### Query Parameters
+
+<ParamField query="status" type="string">
+  Filter by status: `pending`, `active`, `suspended`, `revoked`.
+</ParamField>
+
+<ParamField query="deviceType" type="string">
+  Filter by device type: `esp32`, `browser`, `cli`, `mcp-client`, `custom`.
+</ParamField>
+
+<ParamField query="limit" type="number">
+  Max results.
+</ParamField>
+
+<ParamField query="offset" type="number">
+  Pagination offset.
+</ParamField>
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "devices": [
+    {
+      "id": "dev-abc123",
+      "name": "Kitchen Speaker",
+      "deviceType": "esp32",
+      "platform": "esp32-s3",
+      "status": "active",
+      "trustLevel": 2,
+      "capabilities": { "audio": true, "microphone": true, "speaker": true, "display": false, "buttons": false, "sensors": false }
+    }
+  ],
+  "count": 1
+}
+```
+
+**503 Service Unavailable** -- Device registry not available.
+
+</Accordion>
+
+<Accordion title="GET /api/devices/:id">
+
+Get a single device by ID.
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The device ID.
+</ParamField>
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "device": {
+    "id": "dev-abc123",
+    "name": "Kitchen Speaker",
+    "deviceType": "esp32",
+    "status": "active",
+    "trustLevel": 2
+  }
+}
+```
+
+**404 Not Found** -- Device does not exist.
+
+**503 Service Unavailable** -- Device registry not available.
+
+</Accordion>
+
+<Accordion title="PUT /api/devices/:id">
+
+Update a device's properties.
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The device ID.
+</ParamField>
+
+### Request Body
+
+All fields are optional. Only provided fields are updated.
+
+<ParamField body="name" type="string">
+  Updated device name.
+</ParamField>
+
+<ParamField body="status" type="string">
+  New status: `pending`, `active`, `suspended`, `revoked`.
+</ParamField>
+
+<ParamField body="capabilities" type="object">
+  Updated capability flags.
+</ParamField>
+
+<ParamField body="secret" type="string">
+  New shared secret (8--256 chars).
+</ParamField>
+
+<ParamField body="firmwareVersion" type="string">
+  Updated firmware version.
+</ParamField>
+
+### Response
+
+**200 OK** -- Returns the updated device.
+
+**404 Not Found** -- Device does not exist.
+
+**503 Service Unavailable** -- Device registry not available.
+
+</Accordion>
+
+<Accordion title="DELETE /api/devices/:id">
+
+Remove a device from the registry.
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The device ID to remove.
+</ParamField>
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "success": true,
+  "deviceId": "dev-abc123"
+}
+```
+
+**404 Not Found** -- Device does not exist.
+
+**503 Service Unavailable** -- Device registry not available.
+
+</Accordion>
+
+<Accordion title="POST /api/devices/:id/authenticate">
+
+Authenticate a device by verifying its shared secret.
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The device ID.
+</ParamField>
+
+### Request Body
+
+<ParamField body="secret" type="string" required>
+  The device's shared secret.
+</ParamField>
+
+```json
+{
+  "secret": "my-device-secret"
+}
+```
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "authenticated": true,
+  "device": {
+    "id": "dev-abc123",
+    "name": "Kitchen Speaker",
+    "status": "active"
+  }
+}
+```
+
+**401 Unauthorized** -- Invalid secret.
+
+```json
+{
+  "authenticated": false,
+  "message": "Invalid device secret"
+}
+```
+
+**503 Service Unavailable** -- Device registry not available.
+
+</Accordion>
+
+<Accordion title="POST /api/devices/:id/link">
+
+Link a device to a user account for personalized preferences.
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The device ID.
+</ParamField>
+
+### Request Body
+
+<ParamField body="userId" type="string" required>
+  The user ID to link (max 200 chars).
+</ParamField>
+
+```json
+{
+  "userId": "user-abc123"
+}
+```
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "linked": true,
+  "deviceId": "dev-abc123",
+  "userId": "user-abc123"
+}
+```
+
+**503 Service Unavailable** -- User preferences not available.
+
+</Accordion>
+
+## User Preferences
+
+<Accordion title="GET /api/users/:userId/preferences">
+
+Get user preferences (TTS voice, language, wake word, privacy settings).
+
+### Path Parameters
+
+<ParamField path="userId" type="string" required>
+  The user ID.
+</ParamField>
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "preferences": {
+    "ttsVoice": "af_heart",
+    "ttsSpeed": 1.0,
+    "language": "en",
+    "wakeWord": "hey agtos",
+    "privacySettings": {
+      "storeTranscripts": true,
+      "storeAudio": false
+    }
+  }
+}
+```
+
+**503 Service Unavailable** -- User preferences not available (Redis down).
+
+</Accordion>
+
+<Accordion title="PUT /api/users/:userId/preferences">
+
+Update user preferences.
+
+### Path Parameters
+
+<ParamField path="userId" type="string" required>
+  The user ID.
+</ParamField>
+
+### Request Body
+
+All fields are optional.
+
+<ParamField body="ttsVoice" type="string">
+  Preferred TTS voice (max 100 chars).
+</ParamField>
+
+<ParamField body="ttsSpeed" type="number">
+  Speech speed (0.5--2.0).
+</ParamField>
+
+<ParamField body="language" type="string">
+  Preferred language code (max 10 chars).
+</ParamField>
+
+<ParamField body="wakeWord" type="string">
+  Custom wake word (max 50 chars).
+</ParamField>
+
+<ParamField body="privacySettings" type="object">
+  Privacy flags: `storeTranscripts` (boolean), `storeAudio` (boolean).
+</ParamField>
+
+```json
+{
+  "ttsVoice": "nova",
+  "ttsSpeed": 1.2,
+  "language": "en",
+  "privacySettings": {
+    "storeTranscripts": true,
+    "storeAudio": false
+  }
+}
+```
+
+### Response
+
+**200 OK** -- Returns the updated preferences.
+
+**400 Bad Request** -- Validation failure.
+
+**503 Service Unavailable** -- User preferences not available.
+
+</Accordion>
+
+## Credentials
+
+<Accordion title="POST /api/credentials">
+
+Store encrypted credentials for a provider. Credentials are encrypted with AES-256-GCM before storage.
+
+### Request Body
+
+```json
+{
+  "providerId": "anthropic",
+  "fields": {
+    "apiKey": "sk-ant-api03-your-key"
+  }
+}
+```
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "stored": true,
+  "providerId": "anthropic"
+}
+```
+
+**400 Bad Request** -- Validation failure.
+
+</Accordion>
+
+<Accordion title="POST /api/credentials/validate">
+
+Validate credentials against the actual provider API without storing them. Useful for the setup wizard and Settings UI.
+
+### Request Body
+
+```json
+{
+  "providerId": "anthropic",
+  "fields": {
+    "apiKey": "sk-ant-api03-your-key"
+  }
+}
+```
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "valid": true,
+  "message": "API key is valid (Claude Haiku 4.5 responded)"
+}
+```
+
+```json
+{
+  "valid": false,
+  "message": "Invalid API key: 401 Unauthorized"
+}
+```
+
+</Accordion>
+
+## Dependencies
+
+<Accordion title="GET /api/dependencies">
+
+Check all optional system dependencies (Node.js, Docker, Ollama, Redis, sherpa-onnx models).
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "node": { "installed": true, "version": "v22.12.0", "hint": null },
+  "docker": { "installed": true, "running": true },
+  "ollama": { "installed": true, "reachable": true },
+  "redis": { "installed": true, "reachable": true },
+  "sherpaModels": { "downloaded": 3, "total": 5 }
+}
+```
+
+</Accordion>
+
+## Config (Legacy)
+
+<Accordion title="GET /api/config/writable">
+
+List the configuration keys that can be updated at runtime via the legacy config endpoint.
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "keys": ["ttsVoice", "ttsSpeed", "sttLanguage", "sttModel", "logLevel", "apiRateLimit", "chatRateLimit"],
+  "description": {
+    "ttsVoice": "TTS voice name (e.g., \"alloy\", \"nova\")",
+    "ttsSpeed": "TTS speech speed (0.5-2.0)"
+  },
+  "current": {
+    "ttsVoice": "af_heart",
+    "logLevel": "info"
+  }
+}
+```
+
+</Accordion>
+
+<Accordion title="PUT /api/config">
+
+Update a single runtime config value. The value is applied immediately to the environment variable and persisted to the config file.
+
+### Request Body
+
+<ParamField body="key" type="string" required>
+  Config key name (must be in the writable whitelist).
+</ParamField>
+
+<ParamField body="value" type="string | number | boolean" required>
+  New value for the key.
+</ParamField>
+
+```json
+{
+  "key": "ttsVoice",
+  "value": "nova"
+}
+```
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "key": "ttsVoice",
+  "value": "nova",
+  "envKey": "AGTOS_TTS_VOICE",
+  "applied": true,
+  "persisted": true
+}
+```
+
+**403 Forbidden** -- Key is not writable.
+
+</Accordion>
+
+## Settings
+
+<Accordion title="GET /api/settings">
+
+Retrieve all writable config keys with current values, descriptions, reload types, and categories. Used by the Settings UI for dynamic form generation.
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "settings": {
+    "ttsVoice": {
+      "value": "af_heart",
+      "description": "TTS voice name",
+      "reloadType": "immediate",
+      "category": "tts"
+    },
+    "llmProvider": {
+      "value": "auto",
+      "description": "Primary LLM provider",
+      "reloadType": "provider-restart",
+      "category": "llm"
+    }
+  }
+}
+```
+
+</Accordion>
+
+<Accordion title="PUT /api/settings">
+
+Update multiple configuration values at once. All values are validated with Zod schemas, applied to environment variables, persisted to the config file, and announced via `config:changed` event.
+
+### Request Body
+
+Pass a flat object with config keys and their new values:
+
+```json
+{
+  "ttsVoice": "nova",
+  "ttsSpeed": 1.2,
+  "logLevel": "debug"
+}
+```
+
+See [Configuration > Environment Variables](/configuration/environment) for the full list of writable keys.
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "changed": ["ttsVoice", "ttsSpeed", "logLevel"],
+  "persisted": true
+}
+```
+
+**400 Bad Request** -- Validation failure with field-level details.
+
+```json
+{
+  "error": "Invalid settings update",
+  "details": [
+    { "field": "ttsSpeed", "message": "Number must be less than or equal to 2" }
+  ]
+}
+```
+
+</Accordion>
+
+<Accordion title="GET /api/settings/schema">
+
+Return the Zod schema as a JSON description for dynamic form generation in the Settings UI. Includes type, description, reload behavior, category, and constraints for each key.
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "schema": {
+    "ttsSpeed": {
+      "type": "number",
+      "description": "TTS speech speed (0.5–2.0)",
+      "reloadType": "immediate",
+      "category": "tts",
+      "constraints": { "min": 0.5, "max": 2.0, "step": 0.1 }
+    },
+    "llmProvider": {
+      "type": "enum",
+      "description": "Primary LLM provider",
+      "reloadType": "provider-restart",
+      "category": "llm",
+      "constraints": { "options": ["claude", "ollama", "auto"] }
+    }
+  }
+}
+```
+
+</Accordion>
+
 ## Common Error Responses
 
 All endpoints may return the following error shapes:

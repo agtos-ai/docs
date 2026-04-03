@@ -1,0 +1,198 @@
+---
+title: "CLI Reference"
+description: "Complete command reference for the agtOS CLI tool"
+---
+
+The `agtos` CLI provides a text-based interface for managing the agtOS system. It communicates with the running server via the REST API on the health port (default 4102).
+
+## Installation
+
+```bash
+# Run directly (no install needed)
+npx agtos <command>
+
+# Or install globally
+npm install -g agtos
+agtos <command>
+```
+
+## Global Options
+
+| Flag | Description |
+|------|-------------|
+| `--help`, `-h` | Show help message |
+| `--version`, `-v` | Show version |
+| `--api-url <url>` | Override API base URL (default: `http://localhost:4102`) |
+
+## Commands
+
+### `agtos start`
+
+Start the agtOS server. Spawns the server as a child process, monitors startup, and reports when the health endpoint is ready.
+
+```bash
+agtos start
+```
+
+On first run (no `.env.local` or `~/.agtos/config.json` found), the CLI will prompt you to run `agtos setup` first.
+
+The server starts three listeners:
+- Port 3000: Voice WebSocket
+- Port 4100: MCP Server (Streamable HTTP)
+- Port 4102: Health + REST API + Dashboard
+
+### `agtos setup`
+
+Interactive first-run configuration wizard. Checks prerequisites, prompts for API keys, validates credentials against the actual provider API, and writes `.env.local`.
+
+```bash
+agtos setup
+```
+
+The wizard performs these steps:
+1. **Node.js version check** -- requires 22+
+2. **Docker check** -- optional, needed for Redis
+3. **Ollama check** -- optional, enables local AI routing
+4. **Claude API key prompt** -- validates `sk-ant-api03-` keys against the API
+5. **Claude OAuth token prompt** -- validates `sk-ant-oat01-` tokens
+6. **OpenAI key prompt** -- optional, for OpenAI-compatible providers
+7. **Write `.env.local`** -- saves validated credentials
+
+### `agtos status`
+
+Display system health and service status. Fetches data from the health and system info API endpoints.
+
+```bash
+agtos status
+```
+
+Shows:
+- Overall system health (healthy/degraded)
+- Per-service status (Redis, STT, TTS, Ollama, Claude, MCP)
+- Uptime, Node.js version, memory usage
+- Port configuration
+
+### `agtos chat`
+
+Interactive text chat with the agtOS agent. Uses the same agent reasoning loop as the voice pipeline.
+
+```bash
+# Interactive mode
+agtos chat
+
+# Single message
+agtos chat "What time is it?"
+```
+
+The chat command connects to `POST /api/chat` and displays responses in the terminal.
+
+### `agtos schedule`
+
+Manage scheduled tasks.
+
+```bash
+# List all scheduled tasks
+agtos schedule list
+
+# Create a new scheduled task
+agtos schedule create <name> <type> <expression> <topic>
+```
+
+**Create examples:**
+
+```bash
+# Cron task — run every day at 7 AM
+agtos schedule create "morning-briefing" cron "0 7 * * *" briefing.morning
+
+# Interval — check every 5 minutes
+agtos schedule create "status-check" interval "300000" system.check
+```
+
+| Argument | Description |
+|----------|-------------|
+| `name` | Human-readable task name |
+| `type` | Schedule type: `cron`, `once`, `interval` |
+| `expression` | Cron expression, timestamp, or interval in ms |
+| `topic` | Event bus topic to publish when the task fires |
+
+### `agtos memory`
+
+Search and manage agent memory.
+
+```bash
+# Search memory
+agtos memory search "last conversation about weather"
+
+# Import memories from external AI tools (Claude, ChatGPT, etc.)
+agtos memory import
+```
+
+The `search` subcommand queries the episodic and semantic memory system via `GET /api/memory/search`.
+
+The `import` subcommand scans for memories from external AI tools and imports them into agtOS via `GET /api/memory/sources` and `POST /api/memory/import`.
+
+### `agtos task`
+
+Run a background agent task. The task is processed through the same agent reasoning loop as chat, but designed for longer-running workloads.
+
+```bash
+agtos task "research current weather in San Francisco"
+agtos task "summarize recent conversations"
+```
+
+### `agtos models`
+
+Manage sherpa-onnx ONNX model files for the local voice pipeline. This command operates directly on the local filesystem and does not require the server to be running.
+
+```bash
+# List all available models with download status
+agtos models list
+
+# Download the default model set (~460MB)
+agtos models download --default
+
+# Download a specific model
+agtos models download sensevoice-int8
+
+# Show model details
+agtos models info moonshine-tiny-en-int8
+
+# Remove a downloaded model
+agtos models remove sensevoice-int8
+```
+
+**Default model set** (5 models needed for a full local voice pipeline):
+- `silero-vad` -- Voice Activity Detection
+- `moonshine-tiny-en-int8` -- Fast English STT
+- `sensevoice-int8` -- Multilingual STT (zh, en, ja, ko)
+- `kokoro-int8-multi-v1` -- TTS (Kokoro)
+- `zipformer-streaming-en-20m` -- Streaming STT for real-time partial results
+
+Models are stored in `~/.agtos/models/` (configurable via `AGTOS_MODEL_DIR`).
+
+### `agtos doctor`
+
+System health diagnostics. Checks all dependencies and reports pass/warn/fail status with actionable remediation hints.
+
+```bash
+agtos doctor
+```
+
+Checks performed:
+- **Node.js** -- version 22+ required
+- **Redis** -- connection test
+- **Ollama** -- reachability check
+- **sherpa-onnx models** -- download status
+- **Config file** -- existence and validity
+- **Voice port** (3000) -- availability
+- **Health endpoint** (4102) -- responsiveness
+- **MCP port** (4100) -- availability
+- **Credentials** -- validates API keys against provider APIs
+- **Network** -- basic connectivity check
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AGTOS_API_URL` | `http://localhost:4102` | API base URL for CLI commands |
+| `HEALTH_PORT` | `4102` | Health server port (used to construct default API URL) |

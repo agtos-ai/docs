@@ -44,7 +44,8 @@
               "features/voice-pipeline",
               "features/chat",
               "features/memory",
-              "features/mcp"
+              "features/mcp",
+              "features/cli"
             ]
           }
         ]
