@@ -154,6 +154,28 @@ sherpa-onnx is the default provider. These variables tune its behavior. Set `STT
 |---|---|---|
 | `COMMAND_PROVIDER` | `model-router` | LLM provider for the voice pipeline: `model-router`, `claude`, or `ollama` |
 
+## Cognitive Task Providers
+
+These variables configure independent provider selection for specialized AI tasks ([ADR-018](/architecture/decisions#adr-018)). Each task can use a different provider (`ollama`, `claude`, or `openrouter`), allowing you to optimize cost, quality, and privacy per task.
+
+| Variable | Default | Description |
+|---|---|---|
+| `AGTOS_EMBEDDING_PROVIDER` | `ollama` | Embedding provider (`ollama` for local, `openrouter` for cloud) |
+| `AGTOS_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model |
+| `AGTOS_CLASSIFIER_PROVIDER` | `ollama` | Intent classification provider |
+| `AGTOS_CLASSIFIER_MODEL` | -- (uses Ollama default) | Intent classification model |
+| `AGTOS_CONSOLIDATION_PROVIDER` | -- | Memory consolidation (Dreamer) provider |
+| `AGTOS_CONSOLIDATION_MODEL` | -- | Memory consolidation model |
+| `AGTOS_REASONING_PROVIDER` | -- | User reasoning (Dialectic) provider |
+| `AGTOS_REASONING_MODEL` | -- | User reasoning model |
+| `AGTOS_SUMMARIZATION_PROVIDER` | -- | Conversation summarization provider |
+| `AGTOS_SUMMARIZATION_MODEL` | -- | Conversation summarization model |
+| `OPENROUTER_API_KEY` | -- | OpenRouter API key (required when using `openrouter` provider for any task) |
+
+<Info>
+These settings are also configurable at runtime via `PUT /api/settings`. Changes to provider settings require a provider restart to take effect.
+</Info>
+
 ## Redis
 
 | Variable | Default | Description |
@@ -187,6 +209,34 @@ Tauri 2 desktop app origins (`tauri://localhost`, `https://tauri.localhost`) are
 | Variable | Default | Description |
 |---|---|---|
 | `AGTOS_MDNS_ENABLED` | `false` | Enable mDNS UDP multicast for ESP32 zero-config discovery |
+
+## Runtime Configuration (Hot-Reload)
+
+These variables are managed by the Settings API (`PUT /api/settings`) and the legacy config API (`PUT /api/config`). They can be changed at runtime without restarting the server.
+
+| Variable | Default | Reload Type | Description |
+|---|---|---|---|
+| `AGTOS_TTS_VOICE` | `af_heart` | immediate | TTS voice name |
+| `AGTOS_TTS_SPEED` | `1.0` | immediate | TTS speech speed (0.5--2.0) |
+| `AGTOS_STT_LANGUAGE` | `en` | provider-restart | STT language code |
+| `AGTOS_STT_MODEL` | `moonshine-tiny-en-int8` | provider-restart | STT model ID |
+| `AGTOS_STT_STREAMING_MODEL` | `zipformer-streaming-en-20m` | provider-restart | Streaming STT model ID |
+| `AGTOS_LLM_PROVIDER` | -- | provider-restart | Primary LLM provider (`claude`, `ollama`, `auto`) |
+| `AGTOS_LLM_MODEL` | -- | provider-restart | LLM model name |
+| `AGTOS_API_RATE_LIMIT` | -- | immediate | API rate limit per minute (1--1000) |
+| `AGTOS_CHAT_RATE_LIMIT` | -- | immediate | Chat rate limit per minute (1--100) |
+| `AGTOS_MEMORY_SEARCH_MODE` | `hybrid` | immediate | Memory search strategy (`hybrid`, `vector`, `bm25`) |
+| `AGTOS_MEMORY_QUERY_EXPANSION` | `false` | immediate | Enable Ollama-powered query expansion |
+| `AGTOS_VAD_THRESHOLD` | `0.3` | immediate | VAD speech detection threshold (0.0--1.0) |
+| `AGTOS_VAD_SENSITIVITY` | -- | immediate | VAD sensitivity preset (`low`, `medium`, `high`) |
+| `AGTOS_AUDIO_INPUT_DEVICE` | -- | provider-restart | Audio input device ID |
+| `AGTOS_MEMORY_RETENTION_DAYS` | `30` | immediate | Memory retention in days (1--365) |
+| `AGTOS_NOTIFICATIONS_ENABLED` | -- | immediate | Enable desktop notifications |
+| `AGTOS_PTT_HOTKEY` | -- | immediate | Push-to-talk hotkey (e.g., `Alt+Space`) |
+
+<Note>
+The `API_RATE_LIMIT` and `CHAT_RATE_LIMIT` variables (without the `AGTOS_` prefix) are used at server startup. The `AGTOS_` prefixed versions are used by the runtime config system for hot-reload. Both control the same behavior — set the non-prefixed versions in `.env.local` for startup defaults, and use the Settings API to adjust at runtime.
+</Note>
 
 ## Credentials / Encryption
 
@@ -273,6 +323,15 @@ NODE_ENV=production
 
 # === Features ===
 AGTOS_MDNS_ENABLED=false
+
+# === Cognitive Task Providers (optional) ===
+# AGTOS_EMBEDDING_PROVIDER=ollama
+# AGTOS_EMBEDDING_MODEL=nomic-embed-text
+# AGTOS_CLASSIFIER_PROVIDER=ollama
+# AGTOS_CONSOLIDATION_PROVIDER=ollama
+# AGTOS_REASONING_PROVIDER=ollama
+# AGTOS_SUMMARIZATION_PROVIDER=ollama
+# OPENROUTER_API_KEY=sk-or-your-key  # Only needed for openrouter provider
 ```
 </Accordion>
 
