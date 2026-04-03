@@ -116,24 +116,26 @@ The intent classifier is a small, fast model that categorizes every incoming req
 Ollama has a confirmed bug where streaming + tools enabled simultaneously produces malformed output. agtOS automatically uses `stream: false` when tools are involved, which adds latency but produces correct results.
 </Warning>
 
-## speaches STT/TTS
+## speaches STT/TTS (Fallback)
 
-[speaches](https://github.com/speaches-ai/speaches) is a self-hosted server that provides OpenAI-compatible speech-to-text and text-to-speech endpoints. agtOS uses it for the cascade voice pipeline.
+[speaches](https://github.com/speaches-ai/speaches) is a self-hosted server that provides OpenAI-compatible speech-to-text and text-to-speech endpoints. agtOS can use it as a fallback when sherpa-onnx is not available.
 
 ### Configuration
 
 ```bash
 # .env.local
 
+# Use external speaches server (fallback)
+STT_PROVIDER=speaches
+TTS_PROVIDER=speaches
+
 # speaches server URL (shared by STT and TTS)
 SPEACHES_URL=http://localhost:8000
 
 # --- Speech-to-Text ---
-STT_PROVIDER=speaches
 SPEACHES_STT_MODEL=Systran/faster-whisper-small
 
 # --- Text-to-Speech ---
-TTS_PROVIDER=speaches
 SPEACHES_TTS_MODEL=speaches-ai/Kokoro-82M-v1.0-ONNX
 SPEACHES_TTS_VOICE=af_heart
 ```
@@ -162,9 +164,9 @@ SPEACHES_TTS_VOICE=af_heart
 speaches does not support `opus` or `aac` audio formats. Use `wav` (default) or `mp3`.
 </Note>
 
-## sherpa-onnx Provider
+## sherpa-onnx Provider (Default)
 
-sherpa-onnx runs STT, TTS, and VAD directly in the Node.js process via a native ONNX Runtime addon. No Python, no external server, no HTTP round-trips. See [ADR-017](/architecture/decisions#adr-017) for the decision rationale.
+sherpa-onnx is the default STT/TTS/VAD provider. It runs directly in the Node.js process via a native ONNX Runtime addon. No Python, no external server, no HTTP round-trips. See [ADR-017](/architecture/decisions#adr-017) for the decision rationale.
 
 ### Why sherpa-onnx?
 
@@ -177,7 +179,7 @@ sherpa-onnx runs STT, TTS, and VAD directly in the Node.js process via a native 
 ### Configuration
 
 ```bash
-# Enable sherpa-onnx (replaces speaches)
+# sherpa-onnx is the default — these are shown for clarity
 STT_PROVIDER=sherpa-onnx
 TTS_PROVIDER=sherpa-onnx
 

@@ -59,7 +59,7 @@ agtOS supports three audio processing architectures. The default is **cascade**,
 The cascade architecture processes audio through discrete stages:
 
 1. **VAD** (Silero) filters silence and noise locally before sending to the server
-2. **STT** (speaches/Whisper) transcribes speech to text
+2. **STT** (sherpa-onnx, speaches fallback) transcribes speech to text
 3. **LLM** (Claude or Ollama) generates a text response, optionally calling tools
 4. **TTS** (speaches/Kokoro) synthesizes the response as audio
 
@@ -99,11 +99,11 @@ agtOS can run STT, TTS, and VAD entirely in-process using [sherpa-onnx](https://
 ### Switching Providers
 
 ```bash
-# Use in-process sherpa-onnx (no external server needed)
+# Use in-process sherpa-onnx (default, no external server needed)
 STT_PROVIDER=sherpa-onnx
 TTS_PROVIDER=sherpa-onnx
 
-# Use external speaches server (default)
+# Use external speaches server (fallback)
 STT_PROVIDER=speaches
 TTS_PROVIDER=speaches
 ```
@@ -257,11 +257,11 @@ const orchestrator = new VoicePipelineOrchestrator({
     signalingPort: 3000,
   },
   stt: {
-    provider: 'speaches',
-    model: 'whisper-large-v3',
+    provider: 'sherpa-onnx',  // or 'speaches' for external server
+    model: 'moonshine-tiny-en-int8',
   },
   tts: {
-    provider: 'speaches',
+    provider: 'sherpa-onnx',  // or 'speaches' for external server
     voice: 'af_heart',
   },
   command: {
@@ -279,12 +279,12 @@ voice:
   default_variant: cascade
   variants:
     cascade:
-      stt: speaches
+      stt: sherpa-onnx
       llm: claude-haiku-4.5
-      tts: speaches
+      tts: sherpa-onnx
     half_cascade:
       audio_llm: ultravox
-      tts: speaches
+      tts: sherpa-onnx
     native:
       provider: gemini-live
       model: gemini-2.5-flash

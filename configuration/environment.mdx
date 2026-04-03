@@ -93,28 +93,28 @@ In production, always set `AGTOS_API_KEY` to protect the REST API. Without it, a
 | `OLLAMA_INTENT_MODEL` | `qwen3:1.7b` | Small model for intent classification (Tier 1) |
 | `OLLAMA_URL` | `http://localhost:11434` | Alias used by credential validation |
 
-## STT / TTS (speaches)
+## STT / TTS
 
 | Variable | Default | Description |
 |---|---|---|
 | `SPEACHES_URL` | `http://localhost:8000` | speaches server base URL (shared by STT and TTS) |
-| `STT_PROVIDER` | `speaches` | STT provider name |
+| `STT_PROVIDER` | `sherpa-onnx` | STT provider name |
 | `SPEACHES_STT_MODEL` | `Systran/faster-whisper-small` | Faster Whisper model for transcription |
-| `TTS_PROVIDER` | `speaches` | TTS provider name |
+| `TTS_PROVIDER` | `sherpa-onnx` | TTS provider name |
 | `SPEACHES_TTS_MODEL` | `speaches-ai/Kokoro-82M-v1.0-ONNX` | Kokoro model for speech synthesis |
 | `SPEACHES_TTS_VOICE` | `af_heart` | Default TTS voice ID |
 
 ## sherpa-onnx (In-Process Speech Engine)
 
 <Note>
-These variables are only used when `STT_PROVIDER=sherpa-onnx` or `TTS_PROVIDER=sherpa-onnx` is set.
+sherpa-onnx is the default provider. These variables tune its behavior. Set `STT_PROVIDER=speaches` or `TTS_PROVIDER=speaches` to use the external server instead.
 </Note>
 
 ### STT Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `STT_PROVIDER` | `speaches` | Set to `sherpa-onnx` for in-process STT |
+| `STT_PROVIDER` | `sherpa-onnx` | Default in-process engine. Set to `speaches` for external server |
 | `SHERPA_STT_MODEL` | `moonshine-tiny-en-int8` | STT model ID |
 | `SHERPA_STT_STREAMING_MODEL` | `zipformer-streaming-en-20m` | Streaming STT model ID |
 | `SHERPA_STT_NUM_THREADS` | `4` | ONNX Runtime inference threads |
@@ -126,7 +126,7 @@ These variables are only used when `STT_PROVIDER=sherpa-onnx` or `TTS_PROVIDER=s
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TTS_PROVIDER` | `speaches` | Set to `sherpa-onnx` for in-process TTS |
+| `TTS_PROVIDER` | `sherpa-onnx` | Default in-process engine. Set to `speaches` for external server |
 | `SHERPA_TTS_MODEL` | `kokoro-int8-multi-v1` | TTS model ID |
 | `SHERPA_TTS_VOICE` | `af_heart` | Default voice |
 | `SHERPA_TTS_SPEED` | `1.0` | Speech speed (0.5-2.0) |
@@ -231,19 +231,21 @@ OLLAMA_HOST=http://localhost:11434
 OLLAMA_DEFAULT_MODEL=qwen3:4b
 OLLAMA_INTENT_MODEL=qwen3:1.7b
 
-# === speaches STT/TTS (external server) ===
-SPEACHES_URL=http://localhost:8000
-SPEACHES_STT_MODEL=Systran/faster-whisper-small
-SPEACHES_TTS_MODEL=speaches-ai/Kokoro-82M-v1.0-ONNX
-SPEACHES_TTS_VOICE=af_heart
+# === sherpa-onnx (in-process, default) ===
+STT_PROVIDER=sherpa-onnx
+TTS_PROVIDER=sherpa-onnx
+SHERPA_STT_MODEL=moonshine-tiny-en-int8
+SHERPA_TTS_MODEL=kokoro-int8-multi-v1
+SHERPA_TTS_VOICE=af_heart
+AGTOS_MODEL_DIR=~/.agtos/models
 
-# === sherpa-onnx (in-process alternative to speaches) ===
-# STT_PROVIDER=sherpa-onnx
-# TTS_PROVIDER=sherpa-onnx
-# SHERPA_STT_MODEL=moonshine-tiny-en-int8
-# SHERPA_TTS_MODEL=kokoro-int8-multi-v1
-# SHERPA_TTS_VOICE=af_heart
-# AGTOS_MODEL_DIR=~/.agtos/models
+# === speaches STT/TTS (external server fallback) ===
+# STT_PROVIDER=speaches
+# TTS_PROVIDER=speaches
+# SPEACHES_URL=http://localhost:8000
+# SPEACHES_STT_MODEL=Systran/faster-whisper-small
+# SPEACHES_TTS_MODEL=speaches-ai/Kokoro-82M-v1.0-ONNX
+# SPEACHES_TTS_VOICE=af_heart
 
 # === Voice Pipeline ===
 COMMAND_PROVIDER=model-router
