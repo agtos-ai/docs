@@ -300,6 +300,36 @@ COMMAND_PROVIDER=claude
 COMMAND_PROVIDER=ollama
 ```
 
+## Cognitive Task Providers
+
+Beyond the main LLM and speech providers, agtOS has several specialized AI tasks that can each use a different provider ([ADR-018](/architecture/decisions#adr-018)). This allows fine-grained optimization — for example, using local Ollama for embeddings while routing reasoning tasks to Claude.
+
+| Task | Variable | Options | Purpose |
+|------|----------|---------|---------|
+| **Embedding** | `AGTOS_EMBEDDING_PROVIDER` | `ollama`, `openrouter` | Vector embeddings for semantic memory search |
+| **Classification** | `AGTOS_CLASSIFIER_PROVIDER` | `ollama`, `claude`, `openrouter` | Intent classification for model routing |
+| **Consolidation** | `AGTOS_CONSOLIDATION_PROVIDER` | `ollama`, `claude`, `openrouter` | Memory consolidation (Dreamer) — compresses episodic memories |
+| **Reasoning** | `AGTOS_REASONING_PROVIDER` | `ollama`, `claude`, `openrouter` | Dialectic reasoning — synthesizes user profile conclusions |
+| **Summarization** | `AGTOS_SUMMARIZATION_PROVIDER` | `ollama`, `claude`, `openrouter` | Conversation summarization for working memory |
+
+Each task also has a `_MODEL` variable (e.g., `AGTOS_EMBEDDING_MODEL`) to override the default model.
+
+### OpenRouter
+
+[OpenRouter](https://openrouter.ai) is supported as a cloud provider for cognitive tasks. It proxies requests to various LLM providers (OpenAI, Anthropic, Google, etc.) through a single API.
+
+```bash
+OPENROUTER_API_KEY=sk-or-your-key
+AGTOS_REASONING_PROVIDER=openrouter
+AGTOS_REASONING_MODEL=anthropic/claude-sonnet-4
+```
+
+<Note>
+OpenRouter is only available for cognitive tasks (embedding, classification, consolidation, reasoning, summarization). The main LLM provider for chat and voice uses Claude or Ollama directly via the model router.
+</Note>
+
+These settings are also configurable at runtime via `PUT /api/settings` — see [Environment Variables](/configuration/environment#cognitive-task-providers) for the full list.
+
 ## Provider Architecture Summary
 
 <CardGroup cols={2}>
