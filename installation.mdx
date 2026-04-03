@@ -30,6 +30,12 @@ agtos setup    # Interactive configuration
 agtos start    # Start the server
 ```
 
+The setup wizard validates API keys against the actual provider API and supports both:
+- **API key** (`sk-ant-api03-...`) — pay-per-token from console.anthropic.com
+- **Max subscription** (`sk-ant-oat01-...`) — flat-rate Claude subscription
+
+Run `agtos doctor` to check system dependencies and credential status.
+
 ### Docker
 
 ```bash

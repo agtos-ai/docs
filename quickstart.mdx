@@ -39,10 +39,11 @@ npm install
 ## 3. Start the Server
 
 ```bash
-npx tsx src/server.ts
+npx agtos setup   # First-run: validates API keys against provider API
+npx agtos start   # Starts server with progress feedback
 ```
 
-The health endpoint is available immediately at `http://localhost:4102/health`.
+The dashboard and health endpoint are available immediately at `http://localhost:4102/health`.
 
 ## 4. Test Chat
 
@@ -55,7 +56,7 @@ curl -X POST http://localhost:4102/api/chat \
 ## 5. (Optional) Start Voice Services
 
 ```bash
-docker compose up -d redis speaches
+docker compose up -d redis
 ```
 
 Then open the dashboard at `http://localhost:4102` and try voice chat.
