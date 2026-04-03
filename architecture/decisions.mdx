@@ -117,12 +117,28 @@ BYOK credential management (ADR-011) encrypts keys at rest. API security (ADR-01
 **Trade-off**: If the classifier picks the wrong category, the needed tool is not available. Mitigation: always include a "general" fallback category.
 </Accordion>
 
+<Accordion title="ADR-015: Platform-Aware Adapter Routing">
+**Problem**: agtOS runs across multiple platforms (Node.js server, desktop, ESP32), but some tools are only available on specific platforms. There was no way to restrict tool availability per platform.
+
+**Decision**: Add platform-specific adapter overrides in the gateway. Tools can declare which platforms they support via metadata. The gateway filters unavailable tools before the LLM sees them. Backward compatible -- tools without platform metadata are available on all platforms.
+
+**Trade-off**: Adds a secondary lookup map and increases tool metadata complexity. But keeps the orchestration layer platform-agnostic while enabling platform-specific optimizations.
+</Accordion>
+
 <Accordion title="ADR-017: sherpa-onnx In-Process Speech Engine">
 **Problem**: agtOS depended on speaches, a Python-based STT/TTS server with a single maintainer who disappears for months. Critical bugs (transcription hallucination, silence crash) sat unmerged for 39-67+ days. The v0.9.0 release was stuck in RC for 6+ months. Every STT/TTS call required a cross-process HTTP round-trip to the Python sidecar.
 
 **Decision**: Replace speaches with sherpa-onnx-node (v1.12.34), a pre-compiled N-API native addon that runs STT, TTS, and VAD directly in the Node.js process via ONNX Runtime. This brings 17+ STT models (Whisper, Moonshine, SenseVoice, Zipformer, Paraformer), 7 TTS families (Kokoro, Piper, Matcha, ZipVoice), and Silero VAD into a single process. GPU acceleration is available via CUDA (Linux), CoreML (macOS), and DirectML (Windows). speaches is preserved as a config-switchable fallback.
 
 **Trade-off**: Whisper uses greedy decoding only (no beam search), model files require ~460MB local storage, and TypeScript type declarations (~300 lines) must be maintained manually. But the elimination of the Python sidecar, HTTP overhead, and single-maintainer dependency risk far outweighs these costs.
+</Accordion>
+
+<Accordion title="ADR-018: Cognitive Task Provider Architecture">
+**Problem**: agtOS has multiple specialized AI tasks (embedding, classification, reasoning, consolidation, summarization) that each have different cost/latency/quality trade-offs. Using a single provider for all tasks was inefficient.
+
+**Decision**: Allow independent provider selection for each cognitive task. Each task can route to its optimal provider (`ollama` for local inference, `claude` for reasoning, `openrouter` for fallback). This is configured via environment variables and can be changed at runtime via `PUT /api/settings`.
+
+**Trade-off**: More configuration complexity and multiple API keys to manage. But enables fine-grained optimization -- e.g., local Ollama for embeddings (cost-free) while routing complex reasoning to Claude.
 </Accordion>
 
 ## Proposing a New ADR
