@@ -1,0 +1,174 @@
+---
+title: "FAQ"
+description: "Frequently asked questions about agtOS"
+---
+
+## General
+
+<Accordion title="What is agtOS?">
+agtOS is an open-source, voice-native AI agent platform. It connects voice input/output with LLM reasoning, tool execution, and persistent memory. You can talk to it, text it, or connect it to other AI tools via MCP.
+
+It runs locally on your machine — your data stays on your hardware unless you explicitly use a cloud AI provider like Claude.
+</Accordion>
+
+<Accordion title="Is agtOS free?">
+Yes. agtOS is open-source under the FSL-1.1 license — free to use, self-host, and integrate via APIs.
+
+You may need API keys for cloud AI providers (Claude, OpenAI), which have their own pricing. But agtOS itself is free, and you can run it entirely locally with [Ollama](https://ollama.ai) at no cost.
+</Accordion>
+
+<Accordion title="Do I need a Claude API key?">
+No. A Claude API key enables cloud AI for complex reasoning, but agtOS works without one:
+
+- **With Ollama only** — local AI for chat, intent classification, and simple tasks
+- **With Claude** — cloud AI for complex reasoning, coding, analysis, and multi-step agent tasks
+- **With both** — the model router automatically sends simple queries to Ollama (free, fast) and complex queries to Claude (powerful)
+
+Most users get the best experience with both, but you can start with either.
+</Accordion>
+
+<Accordion title="What's the difference between API key and Max subscription?">
+Two ways to pay for Claude:
+
+- **API key** (`sk-ant-api03-...`) — pay-per-token from [console.anthropic.com](https://console.anthropic.com). You pay only for what you use.
+- **Max subscription** (`sk-ant-oat01-...`) — flat monthly rate via your Claude subscription. agtOS uses the `claude` CLI as a subprocess for auth.
+
+Both work identically in agtOS. The setup wizard auto-detects which type you have based on the token prefix.
+</Accordion>
+
+## Installation
+
+<Accordion title="Desktop app vs CLI — which should I use?">
+- **Desktop app** — best for most users. No terminal needed, includes a visual onboarding wizard, system tray with push-to-talk, and auto-updates. Everything is bundled.
+- **CLI** — best for developers who want source access, customization, Docker deployment, or integration into their development workflow.
+
+Both run the same agtOS backend. The desktop app is just a native shell (Tauri 2) around it.
+</Accordion>
+
+<Accordion title="Does agtOS work offline?">
+Partially. With Ollama and sherpa-onnx models installed locally:
+
+- **Text chat** — works offline via Ollama
+- **Voice** — works offline via sherpa-onnx (in-process STT/TTS/VAD)
+- **Complex reasoning** — needs Claude (cloud) for multi-step agent tasks
+
+Redis is needed for cross-session memory and scheduling, but it runs locally too.
+</Accordion>
+
+<Accordion title="What are the system requirements?">
+**Desktop app:** macOS 10.15+, Windows 10+, or Linux (x86_64). ~500MB disk for the app + voice models.
+
+**CLI:** Node.js 22+. Optional: Docker (for Redis), Ollama (for local AI).
+
+**Hardware:** Any modern machine works. Speech processing uses 2-4 CPU threads. GPU is not required but accelerates speech if available (CUDA on Linux, CoreML on macOS).
+</Accordion>
+
+<Accordion title="Why does agtOS need Node.js 22?">
+Node.js 22 provides Single Executable Application (SEA) support (used by the desktop app sidecar), stable WebSocket APIs, and performance improvements in the V8 engine that benefit real-time audio processing. Earlier versions lack these features.
+</Accordion>
+
+## Voice
+
+<Accordion title="How does voice work?">
+agtOS uses a cascade pipeline:
+
+1. **VAD** (Silero) detects when you're speaking
+2. **STT** (sherpa-onnx Moonshine/SenseVoice) transcribes your speech to text
+3. **LLM** (Claude or Ollama) generates a response, potentially using tools
+4. **TTS** (sherpa-onnx Kokoro) synthesizes the response as speech
+
+All speech processing runs in-process by default — no external server needed. Total latency is approximately 500ms.
+</Accordion>
+
+<Accordion title="What languages are supported for voice?">
+STT supports English (default), Chinese, Japanese, and Korean via the SenseVoice model. TTS supports English with 11 voice options (American and British accents). Additional languages and voices are available through the speaches fallback server.
+
+To switch STT language: `SHERPA_STT_MODEL=sensevoice-int8` and `SHERPA_STT_LANGUAGE=zh`.
+</Accordion>
+
+<Accordion title="Can I change the voice?">
+Yes. agtOS includes 11 Kokoro TTS voices. Change via the Settings page in the dashboard, or set `SHERPA_TTS_VOICE` in your config:
+
+| Voice | Description |
+|-------|-------------|
+| `af_heart` | Warm American female (default) |
+| `am_adam` | Confident American male |
+| `bf_emma` | Polished British female |
+| `bm_george` | Authoritative British male |
+
+See [Provider Configuration](/configuration/providers#available-tts-voices) for the full list.
+</Accordion>
+
+## Memory
+
+<Accordion title="How does memory work?">
+Three tiers:
+
+- **Working memory** — current conversation context (always available, in-process)
+- **Episodic memory** — past conversation summaries stored in Redis (cross-session, 30-day TTL)
+- **Semantic memory** — long-term facts and preferences via vector search (Redis + Ollama embeddings)
+
+Without Redis, only working memory is available. Without Ollama, semantic search falls back to keyword matching.
+</Accordion>
+
+<Accordion title="Can I import memories from other AI tools?">
+Yes. agtOS can import conversation history from Claude Code, Cursor, Windsurf, Aider, and GitHub Copilot:
+
+```bash
+npx agtos memory import
+```
+
+Or use the Memory page in the dashboard.
+</Accordion>
+
+## Integration
+
+<Accordion title="How do I connect agtOS to Claude Desktop?">
+Add agtOS as an MCP server in your Claude Desktop config file (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "agtos": { "url": "http://localhost:4100/mcp" }
+  }
+}
+```
+
+Restart Claude Desktop. You can now use agtOS tools (voice, scheduling, memory) directly from Claude.
+</Accordion>
+
+<Accordion title="Can I connect external tools to agtOS?">
+Yes. agtOS is both an MCP **server** (exposes tools to external clients) and an MCP **client** (connects to external MCP servers). This means you can:
+
+- Connect agtOS to smart home servers, knowledge bases, or any MCP-enabled service
+- Connect Claude Desktop, Cursor, or custom agents to agtOS
+
+See [MCP Integration](/features/mcp) for details.
+</Accordion>
+
+<Accordion title="Does agtOS have an API?">
+Yes. Three protocol interfaces:
+
+- **REST API** (port 4102) — 40+ endpoints for chat, memory, scheduling, devices, and configuration
+- **WebSocket** (port 3000) — real-time voice audio streaming
+- **MCP** (port 4100) — 10 built-in tools via Streamable HTTP
+
+See [API Reference](/api-reference/introduction) for complete documentation.
+</Accordion>
+
+## Data & Privacy
+
+<Accordion title="Where is my data stored?">
+All data stays on your machine:
+
+- **Config** — `~/.agtos/config.json` and `.env.local`
+- **Voice models** — `~/.agtos/models/` (~460MB)
+- **Memory** — Redis (if running), stored on localhost
+- **Credentials** — encrypted with AES-256-GCM in the config file
+
+Cloud AI providers (Claude, OpenAI) receive your messages when you use them, subject to their privacy policies. Use Ollama for fully local operation.
+</Accordion>
+
+<Accordion title="Can I delete my memories?">
+Yes. Individual conclusions can be deleted via `DELETE /api/memory/conclusions/:id`. Episodic memories expire automatically after a configurable retention period (default: 30 days). You can also disable memory persistence entirely via user preferences.
+</Accordion>

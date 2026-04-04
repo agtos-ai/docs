@@ -1,0 +1,146 @@
+---
+title: "Logging & Observability"
+description: "Structured logging, Prometheus metrics, and health monitoring in agtOS"
+---
+
+agtOS provides three observability interfaces: structured JSON logs, Prometheus-compatible metrics, and a health check system with per-service status.
+
+## Logging
+
+agtOS uses [Pino](https://getpino.io/) for structured JSON logging.
+
+### Log levels
+
+Set the log level via `LOG_LEVEL` environment variable or the Settings API:
+
+| Level | When to use |
+|-------|-------------|
+| `trace` | Extremely verbose, per-audio-frame diagnostics |
+| `debug` | Development — request/response details, provider calls |
+| `info` | Production default — startup, requests, errors |
+| `warn` | Degraded behavior — fallback providers, missing optional services |
+| `error` | Failures — provider errors, unhandled exceptions |
+| `fatal` | Critical — server cannot start |
+
+```bash
+# Set at startup
+LOG_LEVEL=debug npx agtos start
+
+# Change at runtime (no restart needed)
+curl -X PUT http://localhost:4102/api/settings \
+  -H "Content-Type: application/json" \
+  -d '{"logLevel": "debug"}'
+```
+
+### Output format
+
+| Environment | Format | Best for |
+|-------------|--------|----------|
+| `NODE_ENV=production` | JSON (structured) | Log aggregation (ELK, Loki, CloudWatch) |
+| Development (default) | JSON | Machine parsing, piped through `pino-pretty` for readability |
+
+```bash
+# Pretty-print logs in development
+npx agtos start 2>&1 | npx pino-pretty
+```
+
+### Log dashboard
+
+The web dashboard includes a **Logs** page with filtering by level, component, and correlation ID. Access it at `http://localhost:4102` (Logs tab in the sidebar).
+
+## Metrics
+
+agtOS exposes a **Prometheus-compatible** metrics endpoint for integration with Prometheus, Grafana, and other monitoring tools.
+
+### Endpoint
+
+```
+GET http://localhost:4102/metrics
+```
+
+Returns metrics in the standard text exposition format (`text/plain; version=0.0.4`).
+
+<Note>
+The `/metrics` endpoint does not require authentication, even when `AGTOS_API_KEY` is set. This allows Prometheus to scrape without token configuration.
+</Note>
+
+### Available metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| HTTP request count | Counter | Total requests by method, path, and status code |
+| HTTP request latency | Histogram | Request duration in seconds (buckets: 0.1s, 0.5s, 1s, 5s) |
+| Active voice sessions | Gauge | Currently connected WebSocket clients |
+| STT latency | Histogram | Speech-to-text processing time (p50, p95, p99) |
+| TTS latency | Histogram | Text-to-speech synthesis time (p50, p95, p99) |
+| Audio chunks in/out | Counter | Total audio frames received and sent |
+
+### Prometheus configuration
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'agtos'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['localhost:4102']
+    metrics_path: '/metrics'
+```
+
+## Health Checks
+
+The health system provides per-service status with response times.
+
+### Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Aggregated health of all services |
+| `GET /health/metrics` | Metrics summary (request rates, latency percentiles) |
+| `GET /health/:serviceName` | Individual service health (e.g., `/health/redis`) |
+| `GET /api/health` | Same as `/health` (under API prefix, requires auth if enabled) |
+
+### Service checkers
+
+The health manager runs periodic checks on:
+
+| Service | What it checks |
+|---------|---------------|
+| `redis` | Connection, ping latency |
+| `stt-sherpa-onnx` | STT provider availability and model status |
+| `tts-sherpa-onnx` | TTS provider availability and model status |
+| `ollama` | Server reachability at `OLLAMA_HOST` |
+| `claude` | API key validity (cached) |
+| `mcp-server` | MCP server listening on port |
+
+### Response format
+
+```json
+{
+  "status": "healthy",
+  "services": {
+    "redis": { "status": "healthy", "responseTime": 2 },
+    "ollama": { "status": "healthy", "responseTime": 12 },
+    "stt-sherpa-onnx": { "status": "healthy", "responseTime": 5 }
+  },
+  "timestamp": 1711612800000
+}
+```
+
+Returns `200` when all services are healthy, `503` when any service is degraded.
+
+### Dashboard
+
+The web dashboard **Health** page visualizes service health with color-coded status cards, latency metrics, and auto-refresh every 5 seconds. Access at `http://localhost:4102`.
+
+### CLI diagnostics
+
+```bash
+# Quick health check
+curl http://localhost:4102/health
+
+# Comprehensive diagnostics (12 checks with remediation hints)
+npx agtos doctor
+```
+
+See [CLI Reference](/features/cli#agtos-doctor) for details on the `doctor` command.

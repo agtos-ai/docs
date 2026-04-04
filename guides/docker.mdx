@@ -1,0 +1,141 @@
+---
+title: "Docker Deployment"
+description: "Run agtOS with Docker Compose — including Redis and optional GPU-accelerated speech"
+---
+
+Docker Compose is the recommended way to deploy agtOS in production or when you want Redis and all services running together.
+
+## Quick start
+
+```bash
+git clone https://github.com/agtos-ai/agtos.git
+cd agtos
+docker compose up -d
+```
+
+This starts three services:
+
+| Service | Image | Port | Purpose |
+|---------|-------|------|---------|
+| **agtos** | Built from source | 3000, 4100, 4102 | agtOS server (voice, MCP, API) |
+| **redis** | `redis/redis-stack:latest` | 6379 | Memory, scheduling, devices, sessions |
+| **speaches** | `ghcr.io/speaches-ai/speaches` | 8000 | STT/TTS fallback server (Faster Whisper + Kokoro) |
+
+## Configuration
+
+### Environment variables
+
+Create a `.env.local` file in the project root with your API keys:
+
+```bash
+# Required (pick one)
+ANTHROPIC_API_KEY=sk-ant-api03-your-key
+# ANTHROPIC_AUTH_TOKEN=sk-ant-oat01-your-token
+
+# Optional
+OPENAI_API_KEY=sk-your-openai-key
+AGTOS_API_KEY=your-secret-api-key
+```
+
+Docker Compose automatically loads `.env.local` for secrets.
+
+### Connecting to host services
+
+When running in Docker, use `host.docker.internal` to reach services on the host machine:
+
+```bash
+# Ollama running on host
+OLLAMA_HOST=http://host.docker.internal:11434
+
+# speaches on host (if not using the container)
+SPEACHES_URL=http://host.docker.internal:8000
+```
+
+<Note>
+On Linux, `host.docker.internal` may not work out of the box. Use `--network=host` or add `extra_hosts: ["host.docker.internal:host-gateway"]` to your compose file.
+</Note>
+
+## GPU acceleration
+
+For GPU-accelerated speech processing (STT/TTS), use the GPU override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+```
+
+This adds NVIDIA CUDA support to the speaches container. Requires:
+- NVIDIA GPU with CUDA support
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed
+
+GPU acceleration provides 4-6x faster STT/TTS inference compared to CPU.
+
+## Redis only
+
+If you're running agtOS via the CLI or desktop app but want Redis for memory and scheduling:
+
+```bash
+docker compose up -d redis
+```
+
+Or install Redis directly without Docker:
+
+```bash
+# macOS
+brew install redis && brew services start redis
+
+# Ubuntu/Debian
+sudo apt install redis-server
+```
+
+<Tip>
+The CLI can also install Redis for you: the `POST /api/dependencies/install-redis` endpoint creates a `redis/redis-stack` container automatically.
+</Tip>
+
+## Resource limits
+
+The default Docker Compose configuration sets resource limits:
+
+| Service | CPU | Memory |
+|---------|-----|--------|
+| agtos | 2 cores | 1 GB |
+| redis | 1 core | 512 MB |
+| speaches | 4 cores | 4 GB |
+
+Adjust these in `docker-compose.yml` under `deploy.resources.limits` based on your hardware.
+
+## Volumes
+
+Named volumes persist data across container restarts:
+
+| Volume | Purpose |
+|--------|---------|
+| `redis-data` | Redis database persistence |
+| `speaches-models` | Cached STT/TTS model files |
+| `node-modules` | npm dependencies |
+
+## Health checks
+
+The agtOS container includes a built-in health check:
+
+```
+wget -qO- http://localhost:4102/health
+```
+
+Runs every 30 seconds with a 10-second timeout. Docker reports container health status accordingly.
+
+The speaches container health check verifies model loading:
+
+```
+curl -f http://localhost:8000/v1/models
+```
+
+## Production tips
+
+- Set `NODE_ENV=production` for structured JSON logging and credential salt enforcement
+- Set `AGTOS_API_KEY` to protect API endpoints
+- Set `AGTOS_CREDENTIAL_SALT` for persistent encrypted credential storage
+- Use `restart: unless-stopped` (already configured) for automatic recovery
+- Mount `.env.local` as `env_file` for secrets management
+- Use a reverse proxy (nginx, Caddy) for TLS termination if exposing externally
+
+See [Security](/guides/security) for the full production checklist.

@@ -1,0 +1,123 @@
+---
+title: "Use Cases"
+description: "What you can build and do with agtOS"
+---
+
+agtOS is a platform, not a single-purpose app. Here are the primary ways people use it.
+
+## Personal AI Assistant
+
+Use agtOS as your always-available voice assistant that actually remembers you.
+
+<CardGroup cols={2}>
+  <Card title="Voice interaction" icon="microphone">
+    Talk naturally via the desktop app, browser dashboard, or ESP32 hardware. Press your push-to-talk hotkey from any application.
+  </Card>
+  <Card title="Persistent memory" icon="brain">
+    agtOS remembers your preferences, past conversations, and learned facts across sessions. Ask "What did we discuss last week?" and get real answers.
+  </Card>
+  <Card title="Task scheduling" icon="clock">
+    "Remind me every morning at 7 AM to check my calendar" — agtOS creates and manages cron-based, one-time, and interval tasks.
+  </Card>
+  <Card title="Privacy-first" icon="shield-check">
+    Everything runs on your machine. Use Ollama for fully local AI. Cloud is optional and only used when you choose.
+  </Card>
+</CardGroup>
+
+**Example workflow:**
+1. Install the desktop app and configure a Claude API key
+2. Say "Remember that I prefer metric units and morning meetings"
+3. Ask "Schedule a daily briefing at 7 AM"
+4. Next day, ask "What are my preferences?" — agtOS recalls everything
+
+---
+
+## Smart Home Voice Hub
+
+Connect agtOS to smart home devices via MCP for voice-controlled automation.
+
+```
+You: "Turn off the kitchen lights and set the thermostat to 20 degrees"
+     ↓
+agtOS: Classifies intent → calls home.lights_off + home.set_temperature
+     ↓
+TTS: "Done. Kitchen lights are off and thermostat is set to 20°C."
+```
+
+**How it works:**
+- Connect an external smart home MCP server to agtOS
+- agtOS discovers available tools automatically
+- Voice commands are routed through the agent loop with tool execution
+- Responses are spoken back via TTS
+
+**Hardware:** Use an ESP32-S3 as a dedicated voice terminal in each room. It streams audio over WebSocket to agtOS running on any machine in your network.
+
+---
+
+## Developer Tool Integration
+
+Connect agtOS to your development workflow as an MCP server for Claude Desktop, Cursor, or any MCP client.
+
+<CardGroup cols={2}>
+  <Card title="Voice coding assistant" icon="code">
+    Talk through architecture decisions while agtOS records, remembers context, and integrates with your IDE.
+  </Card>
+  <Card title="Claude Desktop bridge" icon="plug">
+    Add agtOS as an MCP server in Claude Desktop. Use voice, scheduling, and memory tools directly from Claude.
+  </Card>
+</CardGroup>
+
+**Claude Desktop integration:**
+```json
+{
+  "mcpServers": {
+    "agtos": { "url": "http://localhost:4100/mcp" }
+  }
+}
+```
+
+Now Claude Desktop can:
+- `voice.speak` — read responses aloud
+- `schedule.create` — set reminders and recurring tasks
+- `memory.ask_about_user` — recall your preferences and past context
+
+---
+
+## IoT Voice Device
+
+Build a standalone voice device using the ESP32-S3 and agtOS as the backend brain.
+
+**Hardware:** Seeed Studio XIAO ESP32-S3 Sense with I2S microphone and DAC speaker.
+
+**Architecture:**
+```
+ESP32 (mic + speaker)
+    ↓ WebSocket (PCM audio)
+agtOS Server (STT → LLM → TTS)
+    ↓ WebSocket (PCM audio)
+ESP32 (plays TTS response)
+```
+
+**Features:**
+- Wake word detection on-device
+- mDNS zero-config discovery (no manual IP configuration)
+- Device registry with per-device authentication and preferences
+- Platform-aware tool filtering (only send relevant tools to constrained devices)
+
+See the [firmware repository](https://github.com/agtos-ai/agtos-firmware) for ESP32 firmware code.
+
+---
+
+## Multi-Agent Orchestration
+
+Use agtOS as the voice and tool layer for multi-agent systems. The MCP server exposes 10 tools that any AI client can call, while the MCP client connects to external tool servers.
+
+```
+Claude Desktop ──► agtOS (MCP Server) ──► Smart Home MCP Server
+                       │
+                       ├──► Calendar MCP Server
+                       │
+                       └──► Knowledge Base MCP Server
+```
+
+The agent reasoning loop handles multi-step tool execution automatically. Ask a complex question and agtOS orchestrates across multiple tool servers to build a response.
