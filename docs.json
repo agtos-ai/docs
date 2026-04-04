@@ -47,6 +47,14 @@
               "features/mcp",
               "features/cli"
             ]
+          },
+          {
+            "group": "Platform",
+            "pages": [
+              "features/devices",
+              "features/dashboard",
+              "features/desktop"
+            ]
           }
         ]
       },
@@ -75,6 +83,17 @@
             "pages": [
               "architecture/overview",
               "architecture/decisions"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Help",
+            "pages": [
+              "guides/troubleshooting"
             ]
           }
         ]

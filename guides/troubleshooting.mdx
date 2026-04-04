@@ -1,0 +1,235 @@
+---
+title: "Troubleshooting"
+description: "Common issues and solutions for agtOS setup, voice pipeline, memory, and connectivity"
+---
+
+## Diagnostics
+
+Run the built-in diagnostic tool first — it checks all dependencies and reports actionable fixes:
+
+```bash
+npx agtos doctor
+```
+
+The doctor command checks Node.js version, Docker, Redis, Ollama, sherpa-onnx models, API credentials, network connectivity, config file validity, and port availability.
+
+## Common Issues
+
+### Server won't start
+
+<Accordion title="Port already in use">
+
+**Symptom**: `Error: listen EADDRINUSE :::4102`
+
+**Fix**: Another process is using the port. Find and stop it, or use a different port:
+
+```bash
+# Find what's using the port
+lsof -i :4102
+
+# Start on a different port
+npx agtos start --port 8080
+```
+
+The CLI checks ports 3000, 4100, and 4102 before starting. If any are occupied, it reports which process holds them.
+
+</Accordion>
+
+<Accordion title="Node.js version too old">
+
+**Symptom**: `Error: agtOS requires Node.js 22 or higher`
+
+**Fix**: Upgrade Node.js to version 22+. Use [nvm](https://github.com/nvm-sh/nvm) for easy version management:
+
+```bash
+nvm install 22
+nvm use 22
+```
+
+</Accordion>
+
+<Accordion title="Missing API credentials on first run">
+
+**Symptom**: Server starts but warns about missing credentials
+
+**Fix**: Run the setup wizard:
+
+```bash
+npx agtos setup
+```
+
+The wizard validates credentials against the actual provider API before saving. You need at least one of:
+- `ANTHROPIC_API_KEY` (pay-per-token, `sk-ant-api03-` prefix)
+- `ANTHROPIC_AUTH_TOKEN` (Max subscription, `sk-ant-oat01-` prefix)
+
+</Accordion>
+
+### Voice pipeline issues
+
+<Accordion title="No speech detected">
+
+**Symptom**: Voice sessions connect but transcription never triggers
+
+**Possible causes**:
+1. **Models not downloaded**: Run `npx agtos models download --default` to get the default model set (~460MB)
+2. **VAD threshold too high**: Lower it with `SHERPA_VAD_THRESHOLD=0.2` (default is 0.3)
+3. **Microphone not capturing**: Check browser permissions or device configuration
+4. **Wrong audio format**: The server expects 16-bit PCM, 16kHz, mono, little-endian
+
+</Accordion>
+
+<Accordion title="TTS audio is silent or garbled">
+
+**Symptom**: `tts_start` and `tts_end` messages appear but no audible audio
+
+**Fix**: Ensure the TTS model is downloaded and the audio format matches:
+
+```bash
+# Check model status
+npx agtos models list
+
+# Download default TTS model
+npx agtos models download kokoro-int8-multi-v1
+```
+
+If using the browser, verify that AudioContext is in the `running` state (some browsers require a user gesture to start audio).
+
+</Accordion>
+
+<Accordion title="High STT latency">
+
+**Symptom**: Transcription takes several seconds
+
+**Fix**:
+- Use the Moonshine Tiny model for fastest transcription: `SHERPA_STT_MODEL=moonshine-tiny-en-int8`
+- Increase STT threads: `SHERPA_STT_NUM_THREADS=4`
+- If using speaches, ensure GPU acceleration is enabled
+- Use streaming STT for real-time partial results: download the Zipformer streaming model with `npx agtos models download zipformer-streaming-en-20m`
+
+</Accordion>
+
+### Memory issues
+
+<Accordion title="Episodic memory unavailable">
+
+**Symptom**: `503 Memory system not available` or memory search returns empty
+
+**Fix**: Episodic and semantic memory require Redis:
+
+```bash
+# Start Redis via Docker
+docker compose up -d redis
+
+# Or install Redis directly
+# macOS: brew install redis && brew services start redis
+# Ubuntu: sudo apt install redis-server
+
+# Verify Redis is reachable
+redis-cli ping  # Should return: PONG
+```
+
+Check the Redis URL: `REDIS_URL=redis://localhost:6379`
+
+</Accordion>
+
+<Accordion title="Semantic search returns no results">
+
+**Symptom**: Episodic keyword search works but semantic search finds nothing
+
+**Fix**: Semantic memory requires both Redis with the RediSearch module and an embedding provider (Ollama):
+
+```bash
+# Ensure Ollama is running
+ollama serve
+
+# Pull the embedding model
+ollama pull nomic-embed-text
+
+# Verify the embedding provider
+AGTOS_EMBEDDING_PROVIDER=ollama
+AGTOS_EMBEDDING_MODEL=nomic-embed-text
+```
+
+</Accordion>
+
+### Connectivity
+
+<Accordion title="Claude API errors (401/403)">
+
+**Symptom**: `401 Unauthorized` or `403 Forbidden` from the Claude API
+
+**Fix**:
+1. Verify your key format: API keys start with `sk-ant-api03-`, OAuth tokens with `sk-ant-oat01-`
+2. Re-run `npx agtos setup` to validate credentials against the API
+3. Check that the key has not been revoked at [console.anthropic.com](https://console.anthropic.com)
+4. If using a custom endpoint: verify `ANTHROPIC_BASE_URL`
+
+</Accordion>
+
+<Accordion title="Ollama connection refused">
+
+**Symptom**: `ECONNREFUSED 127.0.0.1:11434`
+
+**Fix**: Ensure Ollama is installed and running:
+
+```bash
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Start the server
+ollama serve
+
+# Pull required models
+ollama pull qwen3:1.7b    # Intent classifier
+ollama pull qwen3:4b      # Local query execution
+```
+
+If Ollama is running on a different host: `OLLAMA_HOST=http://your-host:11434`
+
+</Accordion>
+
+<Accordion title="MCP connection issues from Claude Desktop">
+
+**Symptom**: Claude Desktop shows "Failed to connect to MCP server"
+
+**Fix**:
+1. Ensure agtOS is running: `npx agtos status`
+2. Verify the MCP port is accessible: `curl http://localhost:4100/mcp` (should return 405 for GET)
+3. Check your Claude Desktop config (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "agtos": {
+      "url": "http://localhost:4100/mcp"
+    }
+  }
+}
+```
+
+4. Restart Claude Desktop after config changes
+
+</Accordion>
+
+### Docker
+
+<Accordion title="Ollama not reachable from Docker">
+
+**Symptom**: Docker container can't connect to Ollama on the host
+
+**Fix**: Use `host.docker.internal` instead of `localhost`:
+
+```bash
+OLLAMA_HOST=http://host.docker.internal:11434
+```
+
+On Linux, you may need `--network=host` or additional Docker network configuration.
+
+</Accordion>
+
+## Getting Help
+
+- **GitHub Issues**: [github.com/agtos-ai/agtos/issues](https://github.com/agtos-ai/agtos/issues)
+- **System diagnostics**: `npx agtos doctor` (captures all dependency and config status)
+- **Health API**: `curl http://localhost:4102/api/health` (shows per-service status)
+- **Logs**: Set `LOG_LEVEL=debug` for verbose output

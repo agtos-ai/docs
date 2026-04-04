@@ -1,0 +1,87 @@
+---
+title: "Web Dashboard"
+description: "Browser-based management UI for health monitoring, voice interaction, memory browsing, device management, and system configuration"
+---
+
+agtOS includes a built-in web dashboard served on the health port (default `4102`). The dashboard provides a real-time management interface for all platform features.
+
+**URL**: `http://localhost:4102`
+
+## Tech Stack
+
+| Technology | Purpose |
+|------------|---------|
+| React 19 | UI framework |
+| Vite 6 | Build tooling and dev server |
+| TailwindCSS | Styling |
+
+The dashboard is built with accessibility in mind (WCAG AA), supports keyboard navigation, and is fully responsive.
+
+## Pages
+
+### Health
+
+System health overview showing per-service status (Redis, STT, TTS, Ollama, Claude, MCP), latency metrics (p50/p95/p99), request rates, error counts, and server uptime.
+
+### Voice
+
+Real-time voice interaction via the browser. Supports both Push-to-Talk (PTT) and Voice Activity Detection (VAD) modes. Displays live transcripts and TTS playback status.
+
+Uses AudioWorklet-based capture with ScriptProcessorNode fallback for older browsers. Connects to the WebSocket audio transport on port 3000.
+
+### Memory
+
+Browse episodic memories, run semantic searches, view the user profile and Dialectic conclusions, and import memories from external AI tools (Claude Code, Cursor, Windsurf, Aider, Copilot).
+
+### Devices
+
+View and manage registered devices. Shows device type, platform, capabilities, trust level, and status. Supports device activation, suspension, and revocation.
+
+### Tasks
+
+Create and view background agent tasks. Monitor task execution with duration, step count, and tool call metrics.
+
+### Conversations
+
+Browse conversation history with summaries and per-conversation memory. View how working memory was assembled for each session.
+
+### Settings
+
+Dynamic settings UI with 9 categories (TTS, STT, LLM, System, Memory, VAD, Audio, Privacy, Desktop). The form is generated from the settings schema (`GET /api/settings/schema`) and supports real-time updates via `PUT /api/settings`.
+
+Changes with `immediate` reload type take effect instantly. Changes with `provider-restart` reload type require a provider restart (triggered automatically).
+
+### System
+
+Dependency status checks for Docker, Ollama, Redis, and sherpa-onnx models. Shows feature degradation status and actionable remediation hints.
+
+### Logs
+
+Structured JSON log viewer with filtering by level (`trace`, `debug`, `info`, `warn`, `error`, `fatal`), component, and correlation ID.
+
+### Onboarding
+
+Interactive 7-step setup wizard for first-time users:
+
+1. Welcome and overview
+2. Node.js version check
+3. Docker availability check
+4. Ollama availability check
+5. API key configuration
+6. Microphone test
+7. User preferences
+
+<Info>
+The onboarding page is shown automatically on first visit when no configuration is detected.
+</Info>
+
+## Configuration
+
+The dashboard connects to the same ports as all other clients:
+
+| Port | Service |
+|------|---------|
+| 4102 | REST API (health, settings, memory, devices, tasks) |
+| 3000 | WebSocket audio streaming (voice page) |
+
+No additional configuration is needed. The dashboard is served as static files from the health server.

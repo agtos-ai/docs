@@ -1,0 +1,157 @@
+---
+title: "Device Registry"
+description: "Register and manage ESP32, browser, CLI, and custom devices with per-device authentication and user preferences"
+---
+
+agtOS includes a device registry for managing hardware and software clients that connect to the platform. Each device is tracked with its capabilities, authentication status, and linked user preferences.
+
+## Device Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `esp32` | ESP32-based hardware clients | XIAO ESP32-S3 Sense with I2S mic |
+| `browser` | Web dashboard or voice client | Chrome, Firefox voice sessions |
+| `cli` | CLI tool sessions | `npx agtos chat` connections |
+| `mcp-client` | External MCP client connections | Claude Desktop, Cursor |
+| `custom` | User-defined device types | Custom integrations |
+
+## Registration
+
+Register a device with its name, type, platform, and capabilities:
+
+```bash
+curl -X POST http://localhost:4102/api/devices/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Kitchen Speaker",
+    "deviceType": "esp32",
+    "platform": "esp32-s3",
+    "capabilities": {
+      "audio": true,
+      "microphone": true,
+      "speaker": true,
+      "display": false,
+      "buttons": false,
+      "sensors": false
+    },
+    "secret": "my-device-secret",
+    "firmwareVersion": "1.2.0"
+  }'
+```
+
+### Capabilities
+
+Every device declares its hardware capabilities as boolean flags:
+
+| Capability | Description |
+|------------|-------------|
+| `audio` | Can process audio (input or output) |
+| `microphone` | Has a microphone for voice input |
+| `speaker` | Has a speaker for audio output |
+| `display` | Has a screen (for visual feedback) |
+| `buttons` | Has physical buttons |
+| `sensors` | Has environmental sensors (temperature, etc.) |
+
+Capabilities are used by the platform-aware routing system ([ADR-015](/architecture/decisions#adr-015)) to filter tools and adapt responses. For example, a device without a `display` capability won't receive visual-only responses.
+
+## Device Status Lifecycle
+
+Devices progress through a status lifecycle:
+
+```
+pending → active → suspended → revoked
+                ↑        ↓
+                └────────┘
+```
+
+| Status | Description |
+|--------|-------------|
+| `pending` | Newly registered, awaiting activation |
+| `active` | Authenticated and operational |
+| `suspended` | Temporarily disabled (can be reactivated) |
+| `revoked` | Permanently disabled (must re-register) |
+
+## Authentication
+
+Devices authenticate using a shared secret. The secret is hashed with SHA-256 before storage — the plaintext is never persisted.
+
+```bash
+# Authenticate a device
+curl -X POST http://localhost:4102/api/devices/dev-abc123/authenticate \
+  -H "Content-Type: application/json" \
+  -d '{"secret": "my-device-secret"}'
+```
+
+<Note>
+The shared `secret` is optional during registration. Devices without secrets rely on network-level security (e.g., local network, VPN).
+</Note>
+
+## User Linking
+
+Link a device to a user account to enable personalized preferences:
+
+```bash
+curl -X POST http://localhost:4102/api/devices/dev-abc123/link \
+  -H "Content-Type: application/json" \
+  -d '{"userId": "user-abc123"}'
+```
+
+Once linked, the device inherits the user's TTS voice, language, wake word, and privacy preferences.
+
+## User Preferences
+
+Each user can configure preferences that apply across all their linked devices:
+
+```bash
+curl -X PUT http://localhost:4102/api/users/user-abc123/preferences \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ttsVoice": "nova",
+    "ttsSpeed": 1.2,
+    "language": "en",
+    "wakeWord": "hey agtos",
+    "privacySettings": {
+      "storeTranscripts": true,
+      "storeAudio": false
+    }
+  }'
+```
+
+| Preference | Type | Default | Description |
+|------------|------|---------|-------------|
+| `ttsVoice` | string | `af_heart` | Preferred TTS voice (max 100 chars) |
+| `ttsSpeed` | number | `1.0` | Speech speed (0.5--2.0) |
+| `language` | string | `en` | Preferred language code (max 10 chars) |
+| `wakeWord` | string | -- | Custom wake word (max 50 chars) |
+| `privacySettings.storeTranscripts` | boolean | `true` | Whether to persist conversation transcripts |
+| `privacySettings.storeAudio` | boolean | `false` | Whether to persist raw audio |
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/devices/register` | Register a new device |
+| `GET` | `/api/devices` | List devices (with optional filters) |
+| `GET` | `/api/devices/:id` | Get a single device |
+| `PUT` | `/api/devices/:id` | Update device properties |
+| `DELETE` | `/api/devices/:id` | Remove a device |
+| `POST` | `/api/devices/:id/authenticate` | Verify device secret |
+| `POST` | `/api/devices/:id/link` | Link device to a user |
+| `GET` | `/api/users/:userId/preferences` | Get user preferences |
+| `PUT` | `/api/users/:userId/preferences` | Update user preferences |
+
+See [HTTP Endpoints](/api-reference/http-endpoints#devices) for complete request/response documentation.
+
+## Requirements
+
+The device registry requires **Redis** for persistent storage. Without Redis, device registration and user preferences are unavailable.
+
+## mDNS Discovery
+
+For ESP32 devices on the local network, agtOS supports zero-configuration discovery via mDNS:
+
+```bash
+AGTOS_MDNS_ENABLED=true
+```
+
+When enabled, agtOS broadcasts its presence on the local network, allowing ESP32 devices to discover the server automatically without manual IP configuration.

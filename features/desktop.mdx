@@ -1,0 +1,79 @@
+---
+title: "Desktop App"
+description: "Tauri 2 native desktop application with system tray, global push-to-talk hotkey, and bundled agtOS backend"
+---
+
+agtOS ships a native desktop application built with [Tauri 2](https://tauri.app/) that bundles the agtOS backend as a sidecar process. The desktop app provides a native experience on macOS, Linux, and Windows.
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="System Tray" icon="bars">
+    Health indicator in the system tray. Green when healthy, yellow for degraded, red for errors.
+  </Card>
+  <Card title="Global Hotkey" icon="keyboard">
+    Push-to-talk hotkey (default: `Alt+Space`) works from any application. Configurable via settings.
+  </Card>
+  <Card title="Auto-Start" icon="play">
+    Optional auto-start on system login. The backend sidecar starts automatically.
+  </Card>
+  <Card title="Health Monitor" icon="heart-pulse">
+    Monitors backend health and automatically restarts the sidecar if it crashes.
+  </Card>
+</CardGroup>
+
+## Architecture
+
+The desktop app is a Tauri 2 shell that embeds the full agtOS backend:
+
+```
+Tauri 2 (Rust + WebView)
+    │
+    ├── WebView: Dashboard UI (React 19)
+    │
+    └── Sidecar: agtOS Node.js backend (SEA binary)
+            │
+            ├── Port 3000: Voice WebSocket
+            ├── Port 4100: MCP Server
+            └── Port 4102: Health + REST API
+```
+
+The Node.js backend is compiled into a [Single Executable Application (SEA)](https://nodejs.org/api/single-executable-applications.html) binary so users don't need Node.js installed separately.
+
+## Installation
+
+Download the desktop app from [GitHub Releases](https://github.com/agtos-ai/agtos/releases):
+
+| Platform | Format |
+|----------|--------|
+| macOS | `.dmg` |
+| Linux | `.AppImage`, `.deb` |
+| Windows | `.msi`, `.exe` |
+
+## Configuration
+
+The desktop app reads the same environment variables and config file as the CLI:
+
+- `~/.agtos/config.json` — persistent configuration
+- `AGTOS_PTT_HOTKEY` — push-to-talk hotkey (default: `Alt+Space`)
+- `AGTOS_NOTIFICATIONS_ENABLED` — desktop notifications (default: `false`)
+
+These can also be configured via the Settings page in the dashboard UI.
+
+## Push-to-Talk
+
+The global PTT hotkey captures audio from the system microphone and streams it to the voice pipeline. It works from any application — you don't need the agtOS window focused.
+
+```bash
+# Configure the hotkey via environment variable
+AGTOS_PTT_HOTKEY=Alt+Space
+
+# Or via the Settings API
+curl -X PUT http://localhost:4102/api/settings \
+  -H "Content-Type: application/json" \
+  -d '{"pttHotkey": "Ctrl+Shift+M"}'
+```
+
+<Note>
+The desktop app connects to the agtOS backend via `localhost`. It uses the same REST API, WebSocket, and MCP endpoints as the web dashboard and CLI.
+</Note>
