@@ -21,7 +21,7 @@ The dashboard is built with accessibility in mind (WCAG AA), supports keyboard n
 
 ### Health
 
-System health overview showing per-service status (Redis, STT, TTS, Ollama, Claude, MCP), latency metrics (p50/p95/p99), request rates, error counts, and server uptime.
+System health overview with color-coded status cards for each service (Redis, STT, TTS, Ollama, Claude, MCP). Shows latency metrics, request rates, error counts, and server uptime. Auto-refreshes every 5 seconds.
 
 ### Voice
 
@@ -63,13 +63,13 @@ Structured JSON log viewer with filtering by level (`trace`, `debug`, `info`, `w
 
 Interactive 7-step setup wizard for first-time users:
 
-1. Welcome and overview
-2. Node.js version check
-3. Docker availability check
-4. Ollama availability check
-5. API key configuration
-6. Microphone test
-7. User preferences
+1. **Welcome** — overview and time estimate (~5 minutes)
+2. **Dependencies** — auto-detects Redis, Ollama, Docker, and sherpa-onnx models
+3. **AI Provider** — Claude/OpenAI key entry with live validation (or Ollama-only mode)
+4. **Speech Engine** — sherpa-onnx model download status
+5. **Voice Setup** — STT/TTS availability and microphone test with real-time audio level visualization
+6. **Preferences** — TTS voice, language, push-to-talk hotkey
+7. **Done** — service summary and next steps
 
 <Info>
 The onboarding page is shown automatically on first visit when no configuration is detected.
@@ -85,3 +85,7 @@ The dashboard connects to the same ports as all other clients:
 | 3000 | WebSocket audio streaming (voice page) |
 
 No additional configuration is needed. The dashboard is served as static files from the health server.
+
+<Note>
+When running inside the Tauri desktop app, the dashboard gains additional features: global push-to-talk hotkey configuration, native audio capture, and server health monitoring from the Rust backend. These features are progressively enhanced — the same codebase works in both browser and desktop modes.
+</Note>

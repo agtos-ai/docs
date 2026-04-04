@@ -44,11 +44,13 @@ The Node.js backend is compiled into a [Single Executable Application (SEA)](htt
 
 Download the desktop app from [GitHub Releases](https://github.com/agtos-ai/agtos/releases):
 
-| Platform | Format |
-|----------|--------|
-| macOS | `.dmg` |
-| Linux | `.AppImage`, `.deb` |
-| Windows | `.msi`, `.exe` |
+| Platform | Format | Architecture |
+|----------|--------|--------------|
+| macOS | `.dmg` | Apple Silicon (arm64) + Intel (x86\_64) |
+| Linux | `.AppImage`, `.deb` | x86\_64 |
+| Windows | `.msi`, `.exe` | x86\_64 |
+
+The app includes a bundled Node.js backend compiled as a [Single Executable Application](https://nodejs.org/api/single-executable-applications.html) — no separate Node.js installation required.
 
 ## Configuration
 
