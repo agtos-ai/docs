@@ -12,36 +12,23 @@
     { "name": "GitHub", "url": "https://github.com/agtos-ai/agtos" }
   ],
   "tabs": [
-    { "name": "Documentation", "url": "introduction" },
+    { "name": "Get Started", "url": "introduction" },
     { "name": "Features", "url": "features/voice-pipeline" },
-    { "name": "API Reference", "url": "api-reference/introduction" },
-    { "name": "Architecture", "url": "architecture/overview" }
+    { "name": "Guides", "url": "guides/faq" },
+    { "name": "Developers", "url": "api-reference/introduction" }
   ],
   "navigation": {
     "tabs": [
       {
-        "tab": "Documentation",
+        "tab": "Get Started",
         "groups": [
           {
-            "group": "Getting Started",
-            "pages": ["introduction", "quickstart", "installation", "use-cases"]
-          },
-          {
-            "group": "Configuration",
+            "group": "Welcome",
             "pages": [
-              "configuration/authentication",
-              "configuration/providers",
-              "configuration/environment"
-            ]
-          },
-          {
-            "group": "Guides",
-            "pages": [
-              "guides/docker",
-              "guides/security",
-              "guides/logging",
-              "guides/troubleshooting",
-              "guides/faq"
+              "introduction",
+              "quickstart",
+              "installation",
+              "use-cases"
             ]
           }
         ]
@@ -75,27 +62,47 @@
         ]
       },
       {
-        "tab": "API Reference",
+        "tab": "Guides",
         "groups": [
           {
-            "group": "Overview",
-            "pages": ["api-reference/introduction"]
+            "group": "Configuration",
+            "pages": [
+              "configuration/authentication",
+              "configuration/providers",
+              "configuration/environment"
+            ]
           },
           {
-            "group": "Protocols",
+            "group": "Deployment & Operations",
             "pages": [
-              "api-reference/http-endpoints",
-              "api-reference/websocket",
-              "api-reference/mcp-tools"
+              "guides/docker",
+              "guides/security",
+              "guides/logging"
+            ]
+          },
+          {
+            "group": "Help",
+            "pages": [
+              "guides/troubleshooting",
+              "guides/faq"
             ]
           }
         ]
       },
       {
-        "tab": "Architecture",
+        "tab": "Developers",
         "groups": [
           {
-            "group": "System Design",
+            "group": "API Reference",
+            "pages": [
+              "api-reference/introduction",
+              "api-reference/http-endpoints",
+              "api-reference/websocket",
+              "api-reference/mcp-tools"
+            ]
+          },
+          {
+            "group": "Architecture",
             "pages": [
               "architecture/overview",
               "architecture/decisions"
