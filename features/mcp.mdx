@@ -15,9 +15,9 @@ The agtOS MCP server exposes voice pipeline capabilities via the Model Context P
 
 ### Available Tools
 
-The server exposes 9 tools organized into three categories:
+The server exposes 10 built-in tools organized into four categories:
 
-<CardGroup cols={3}>
+<CardGroup cols={2}>
   <Card title="Voice Tools" icon="microphone">
     - `voice.speak` — Synthesize and play speech
     - `voice.listen` — Capture and transcribe audio
@@ -33,7 +33,12 @@ The server exposes 9 tools organized into three categories:
     - `schedule.list` — List scheduled tasks
     - `schedule.cancel` — Cancel a scheduled task
   </Card>
+  <Card title="Memory Tools" icon="brain">
+    - `memory.ask_about_user` — Ask questions about the user via Dialectic reasoning
+  </Card>
 </CardGroup>
+
+When [dynamic tool selection](#dynamic-tool-selection) is enabled, an additional `discover_tools` meta-tool is registered for searching the tool registry at runtime.
 
 ### Connecting from Claude Desktop
 

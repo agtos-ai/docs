@@ -46,6 +46,91 @@ Comprehensive health status from all registered service checkers (Redis, STT, TT
 
 </Accordion>
 
+<Accordion title="GET /health/metrics">
+
+Aggregated metrics summary from the internal metrics collector (request counts, error rates, latency percentiles).
+
+### Response
+
+**200 OK**
+
+```json
+{
+  "requests": { "total": 1420, "perMinute": 15 },
+  "errors": { "total": 3, "perMinute": 0 },
+  "latency": { "p50": 120, "p95": 450, "p99": 800 },
+  "uptime": 3621.45
+}
+```
+
+</Accordion>
+
+<Accordion title="GET /health/:serviceName">
+
+Health status for a single registered service. Returns the same shape as the corresponding entry in `GET /api/health`, but for one service only.
+
+### Path Parameters
+
+<ParamField path="serviceName" type="string" required>
+  Service name (e.g., `redis`, `ollama`, `stt-sherpa-onnx`, `tts-sherpa-onnx`, `mcp-server`).
+</ParamField>
+
+### Response
+
+**200 OK** -- Service is healthy.
+
+```json
+{
+  "status": "healthy",
+  "responseTime": 2
+}
+```
+
+**503 Service Unavailable** -- Service is degraded.
+
+```json
+{
+  "status": "unhealthy",
+  "error": "Connection refused"
+}
+```
+
+**404 Not Found** -- No such service registered.
+
+```json
+{
+  "error": "Unknown service: foo"
+}
+```
+
+</Accordion>
+
+<Accordion title="GET /metrics">
+
+Prometheus-format metrics endpoint for integration with Prometheus, Grafana, and other monitoring tools. Returns all collected metrics in the standard text exposition format.
+
+### Response
+
+**200 OK** (`text/plain; version=0.0.4`)
+
+```
+# HELP agtos_http_requests_total Total HTTP requests
+# TYPE agtos_http_requests_total counter
+agtos_http_requests_total{method="GET",path="/api/health",status="200"} 142
+agtos_http_requests_total{method="POST",path="/api/chat",status="200"} 38
+
+# HELP agtos_http_request_duration_seconds HTTP request latency
+# TYPE agtos_http_request_duration_seconds histogram
+agtos_http_request_duration_seconds_bucket{le="0.1"} 120
+agtos_http_request_duration_seconds_bucket{le="0.5"} 155
+```
+
+<Note>
+The `/metrics` endpoint is served at the root path (not under `/api`). It does not require authentication even when `AGTOS_API_KEY` is set.
+</Note>
+
+</Accordion>
+
 ## Sessions
 
 <Accordion title="GET /api/sessions">
@@ -1637,7 +1722,7 @@ Returned when a required dependency (Redis, voice pipeline, memory system, sched
 </Note>
 
 - **ID validation**: Path parameter IDs (task IDs, workflow IDs) must match `^[a-zA-Z0-9\-_]+$` and be 1--128 characters. Invalid IDs return 400.
-- **CORS**: Configurable via `CORS_ORIGIN` environment variable (default: `*`). Preflight `OPTIONS` requests return 204.
+- **CORS**: Configurable via `CORS_ORIGIN` environment variable (default: `http://localhost:5173`). Tauri desktop origins are auto-added. Preflight `OPTIONS` requests return 204.
 - **Metrics**: All API requests are tracked in the internal metrics system. Latency is recorded per route.
 - **Authentication**: See [Authentication](#authentication) below for opt-in API key auth.
 - **Rate Limiting**: See [Rate Limiting](#rate-limiting) below for per-endpoint limits.

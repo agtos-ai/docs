@@ -439,6 +439,102 @@ Error: Task not found
 
 </Accordion>
 
+## Memory Tools
+
+<Accordion title="memory.ask_about_user — Ask About User">
+
+Ask a question about the user via the Dialectic reasoning engine. Gathers the user profile, stored conclusions, and relevant episodic memories to synthesize an answer with a confidence score.
+
+### Input Schema
+
+<ParamField body="question" type="string" required>
+  The question to ask about the user (max 2,000 characters).
+</ParamField>
+
+### Example Input
+
+```json
+{
+  "question": "What programming languages does this user prefer?"
+}
+```
+
+### Success Response
+
+```json
+{
+  "answer": "Based on conversation history, the user primarily works with TypeScript and Python. They prefer TypeScript for backend services and Python for data analysis.",
+  "confidence": 0.82,
+  "sources": ["ep-abc123", "ep-def456", "ep-ghi789"]
+}
+```
+
+### Error Response
+
+```
+Error: Memory coordinator not available
+```
+
+<Note>
+This tool requires the memory coordinator to be initialized (Redis must be connected). The `confidence` score ranges from 0.0 to 1.0. The `sources` array lists episodic memory IDs used to generate the answer.
+</Note>
+
+</Accordion>
+
+## Discovery Tools
+
+<Accordion title="discover_tools — Search Tool Registry">
+
+Search the tool registry for available tools by keyword or category. This meta-tool is always included in the LLM context window (regardless of dynamic tool selection) so the agent can discover tools that were not pre-selected for the current request.
+
+### Input Schema
+
+<ParamField body="query" type="string" required>
+  Keyword search query to match against tool names and descriptions.
+</ParamField>
+
+<ParamField body="category" type="string">
+  Optional category filter (e.g., `smart_home`, `voice`, `system`).
+</ParamField>
+
+### Example Input
+
+```json
+{
+  "query": "temperature",
+  "category": "smart_home"
+}
+```
+
+### Success Response
+
+```json
+[
+  {
+    "name": "home.set_temperature",
+    "description": "Set the thermostat temperature for a room",
+    "category": "smart_home"
+  },
+  {
+    "name": "home.get_temperature",
+    "description": "Read the current temperature from a room sensor",
+    "category": "smart_home"
+  }
+]
+```
+
+### Error Response
+
+```
+Error: Tool selector not configured
+```
+
+<Note>
+This tool is only registered when a `toolSelector` is configured (dynamic tool selection is enabled). It allows the agent to search for tools that were filtered out by the initial similarity-based selection. See [Dynamic Tool Selection](/features/mcp#dynamic-tool-selection) for details.
+</Note>
+
+</Accordion>
+
 ## Connecting to the MCP Server
 
 ### Using the MCP SDK (Node.js)
@@ -505,12 +601,14 @@ Add agtOS as an MCP server in your Claude Desktop config (`claude_desktop_config
 
 Not all tools are always available. Tool registration depends on which services are running:
 
-| Tool Group     | Dependency         | Condition                                 |
-|----------------|--------------------|-------------------------------------------|
-| Voice tools    | Voice pipeline     | Always registered (may return errors if pipeline down). |
-| System tools   | Health manager     | Always registered.                        |
-| Workflow tools | Workflow engine    | Registered only if workflow engine exists. |
-| Scheduler tools| Redis scheduler    | Registered only if Redis is connected.    |
+| Tool Group      | Dependency         | Condition                                 |
+|-----------------|--------------------|-------------------------------------------|
+| Voice tools     | Voice pipeline     | Always registered (may return errors if pipeline down). |
+| System tools    | Health manager     | Always registered.                        |
+| Memory tools    | Memory coordinator | Registered only if memory coordinator exists (Redis connected). |
+| Workflow tools  | Workflow engine    | Registered only if workflow engine exists. |
+| Scheduler tools | Redis scheduler    | Registered only if Redis is connected.    |
+| Discovery tools | Tool selector      | Registered only if dynamic tool selection is configured. |
 
 <Tip>
 Use `tools/list` to discover which tools are currently available on a running server.

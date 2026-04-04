@@ -132,7 +132,7 @@ Here is the complete flow for a voice interaction using the cascade pipeline:
 
 <CardGroup cols={2}>
   <Card title="MCP Server" icon="plug">
-    Streamable HTTP on port 4100. Exposes 9 built-in tools: `voice.speak`, `voice.listen`, `system.health`, `session.status`, `workflow.run`, `workflow.list`, `schedule.create`, `schedule.list`, `schedule.cancel`.
+    Streamable HTTP on port 4100. Exposes 10 built-in tools: `voice.speak`, `voice.listen`, `system.health`, `session.status`, `workflow.run`, `workflow.list`, `schedule.create`, `schedule.list`, `schedule.cancel`, `memory.ask_about_user`.
   </Card>
   <Card title="MCP Client" icon="link">
     Connects to external MCP servers for tool discovery. Auto-discovery with reconnection support.
@@ -155,7 +155,7 @@ Here is the complete flow for a voice interaction using the cascade pipeline:
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| **Runtime** | Node.js 20+ / TypeScript | Server, CLI, all business logic |
+| **Runtime** | Node.js 22+ / TypeScript | Server, CLI, all business logic |
 | **Cloud LLM** | Claude (Anthropic SDK) | Complex reasoning, agentic tasks |
 | **Local LLM** | Ollama (Qwen3, etc.) | Intent classification, simple queries |
 | **STT** | sherpa-onnx (Moonshine/SenseVoice) or speaches (Faster Whisper) | Speech-to-text transcription |

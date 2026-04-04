@@ -38,7 +38,9 @@ Client                                Server
   |  --- binary audio frames --------->  |  (microphone PCM data)
   |  --- binary audio frames --------->  |
   |                                      |  (STT processing)
+  |  <--- transcript (JSON, role:user)   |
   |                                      |  (LLM reasoning)
+  |  <--- transcript (JSON, role:asst)   |
   |                                      |  (TTS synthesis)
   |  <--- tts_start (JSON) ----------   |
   |  <--- binary audio frames --------  |  (TTS PCM data)
@@ -231,6 +233,36 @@ Sent when an error occurs during processing.
 | `type`      | string | Always `"error"`.                    |
 | `sessionId` | string | Associated session (if available).   |
 | `error`     | string | Human-readable error description.    |
+
+</Accordion>
+
+<Accordion title="transcript">
+
+Sent when speech has been transcribed (STT result) or when the assistant produces a text response. Includes the transcript text, the role that produced it, and optional word-level timestamps.
+
+```json
+{
+  "type": "transcript",
+  "sessionId": "session-a1b2c3d4e5f6",
+  "text": "Turn on the kitchen lights",
+  "role": "user",
+  "words": [
+    { "word": "Turn", "start": 120, "end": 280 },
+    { "word": "on", "start": 300, "end": 400 },
+    { "word": "the", "start": 420, "end": 500 },
+    { "word": "kitchen", "start": 520, "end": 720 },
+    { "word": "lights", "start": 740, "end": 920 }
+  ]
+}
+```
+
+| Field   | Type   | Description                                                    |
+|---------|--------|----------------------------------------------------------------|
+| `type`  | string | Always `"transcript"`.                                         |
+| `sessionId` | string | Associated session ID.                                    |
+| `text`  | string | The transcribed or generated text.                             |
+| `role`  | string | Who produced the text: `"user"` (STT result) or `"assistant"` (LLM response). |
+| `words` | array  | Optional word-level timestamps. Each entry has `word` (string), `start` (ms), and `end` (ms). Only present for STT transcripts when timestamp support is enabled. |
 
 </Accordion>
 
