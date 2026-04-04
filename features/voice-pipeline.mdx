@@ -297,3 +297,14 @@ The voice pipeline degrades gracefully when components are unavailable:
 - If the local STT/TTS server is down, fall back to cloud providers
 - If Redis is unavailable, voice sessions still work (without memory persistence)
 - Health checks for each component (STT, TTS, Ollama, Claude) are exposed via the `/api/health` endpoint
+
+## What's next
+
+<CardGroup cols={2}>
+  <Card title="WebSocket Protocol" icon="wave-sine" href="/api-reference/websocket">
+    Detailed protocol reference for the audio transport layer.
+  </Card>
+  <Card title="Chat API" icon="message" href="/features/chat">
+    Text-based chat endpoint using the same agent reasoning loop.
+  </Card>
+</CardGroup>
