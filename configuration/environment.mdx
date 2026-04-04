@@ -120,6 +120,8 @@ sherpa-onnx is the default provider. These variables tune its behavior. Set `STT
 | `SHERPA_STT_PROVIDER` | `cpu` | Execution provider (`cpu`, `cuda`, `coreml`) |
 | `SHERPA_STT_LANGUAGE` | `en` | Default language |
 | `SHERPA_STT_TIMEOUT_MS` | `30000` | Inference timeout in milliseconds |
+| `SHERPA_STT_TIMESTAMPS` | `true` | Enable word-level timestamps in transcription |
+| `SHERPA_STT_ENDPOINT` | `true` | Enable endpoint detection (auto-detect end of speech in streaming) |
 
 ### TTS Configuration
 
@@ -131,6 +133,9 @@ sherpa-onnx is the default provider. These variables tune its behavior. Set `STT
 | `SHERPA_TTS_SPEED` | `1.0` | Speech speed (0.5-2.0) |
 | `SHERPA_TTS_NUM_THREADS` | `2` | ONNX Runtime threads per TTS instance |
 | `SHERPA_TTS_POOL_SIZE` | `3` | Concurrent TTS instances |
+| `SHERPA_TTS_POOL_TIMEOUT_MS` | `30000` | Timeout for acquiring a TTS instance from the pool |
+| `SHERPA_TTS_TIMEOUT_MS` | `30000` | Per-request TTS inference timeout |
+| `SHERPA_TTS_MAX_SENTENCES` | `99` | Maximum sentences per synthesis batch |
 
 ### VAD Configuration
 
@@ -140,6 +145,9 @@ sherpa-onnx is the default provider. These variables tune its behavior. Set `STT
 | `SHERPA_VAD_MIN_SPEECH` | `0.25` | Minimum speech duration (seconds) |
 | `SHERPA_VAD_MIN_SILENCE` | `0.5` | Silence gap to end segment (seconds) |
 | `SHERPA_VAD_MAX_SPEECH` | `20` | Maximum segment before split (seconds) |
+| `SHERPA_VAD_WINDOW_SIZE` | `512` | Audio frame size for VAD processing |
+| `SHERPA_VAD_NUM_THREADS` | `1` | CPU threads for VAD inference |
+| `SHERPA_VAD_BUFFER_SECONDS` | `60` | Audio history buffer size (seconds) |
 
 ### Model Storage
 

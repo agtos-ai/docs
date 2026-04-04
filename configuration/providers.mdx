@@ -194,6 +194,24 @@ SHERPA_TTS_NUM_THREADS=2
 SHERPA_TTS_POOL_SIZE=3                     # Concurrent TTS instances
 ```
 
+### Available TTS Voices
+
+The Kokoro TTS model includes 11 built-in voices. OpenAI voice names are mapped to their closest Kokoro equivalents.
+
+| Voice ID | Description | OpenAI Alias |
+|----------|-------------|--------------|
+| `af_heart` | Warm, natural American female | `alloy` |
+| `af_bella` | Clear, expressive American female | `nova` |
+| `af_nicole` | Calm, professional American female | -- |
+| `af_sarah` | Friendly, conversational American female | -- |
+| `af_sky` | Bright, energetic American female | -- |
+| `am_adam` | Steady, confident American male | `echo` |
+| `am_michael` | Friendly, conversational American male | `onyx` |
+| `bf_emma` | Polished British female | `shimmer` |
+| `bf_isabella` | Elegant British female | -- |
+| `bm_george` | Authoritative British male | `fable` |
+| `bm_lewis` | Warm British male | -- |
+
 ### Model Router
 
 The STT model router automatically selects the best model based on context:

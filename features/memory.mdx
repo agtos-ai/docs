@@ -249,8 +249,9 @@ Conclusions have a confidence score (0.0--1.0) and a type:
 | Type | Description |
 |------|-------------|
 | `explicit` | Directly stated by the user ("I prefer metric units") |
-| `inferred` | Synthesized from patterns across episodes |
-| `corrected` | Updated after user correction of a previous conclusion |
+| `deductive` | Logically derived from multiple facts (A + B implies C) |
+| `inductive` | Generalized from observed patterns across sessions |
+| `abductive` | Best explanation for observed user behavior |
 
 Configure the Dreamer provider independently:
 ```bash
