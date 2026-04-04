@@ -32,7 +32,12 @@ Start the agtOS server. Spawns the server as a child process, monitors startup, 
 
 ```bash
 agtos start
+agtos start --port 8080
 ```
+
+| Flag | Description |
+|------|-------------|
+| `--port <number>` | Override the health/API port (default: 4102). Must be 1--65535. |
 
 On first run (no `.env.local` or `~/.agtos/config.json` found), the CLI will prompt you to run `agtos setup` first.
 
@@ -77,14 +82,19 @@ Shows:
 Interactive text chat with the agtOS agent. Uses the same agent reasoning loop as the voice pipeline.
 
 ```bash
-# Interactive mode
 agtos chat
-
-# Single message
-agtos chat "What time is it?"
 ```
 
-The chat command connects to `POST /api/chat` and displays responses in the terminal.
+The chat command opens an interactive prompt that connects to `POST /api/chat` and displays responses in the terminal. Type your messages and press Enter to send.
+
+**In-chat commands:**
+
+| Command | Action |
+|---------|--------|
+| `/quit` or `/exit` | Exit chat |
+| `/help` | Show help |
+| `/session` | Show current session ID |
+| `/new` | Start a new session |
 
 ### `agtos schedule`
 
@@ -157,8 +167,11 @@ agtos models download sensevoice-int8
 # Show model details
 agtos models info moonshine-tiny-en-int8
 
-# Remove a downloaded model
+# Remove a downloaded model (prompts for confirmation)
 agtos models remove sensevoice-int8
+
+# Remove without confirmation prompt
+agtos models remove sensevoice-int8 --force
 ```
 
 **Default model set** (5 models needed for a full local voice pipeline):
