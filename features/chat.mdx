@@ -203,18 +203,13 @@ Authentication is opt-in. If `AGTOS_API_KEY` is not set, the endpoint is open. S
 
 ## CLI Integration
 
-The `npx agtos chat` command uses this same endpoint under the hood:
+The `npx agtos chat` command uses this same endpoint under the hood. It opens an interactive prompt with session persistence:
 
 ```bash
-# Interactive chat session
 npx agtos chat
-
-# Single message
-npx agtos chat "What time is it?"
-
-# With session persistence
-npx agtos chat --session my-session "Remember this for later"
 ```
+
+In-chat commands: `/quit`, `/exit`, `/help`, `/session` (show session ID), `/new` (start new session). See [CLI Reference](/features/cli#agtos-chat) for details.
 
 ## Background Tasks
 

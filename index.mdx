@@ -17,16 +17,24 @@ agtOS is an open-source, voice-native AI agent platform — the infrastructure f
   <Card title="Authentication" icon="key" href="/configuration/authentication">
     Configure Claude API key or Max subscription
   </Card>
+  <Card title="CLI Reference" icon="terminal" href="/features/cli">
+    9 commands for managing agtOS from the terminal
+  </Card>
   <Card title="API Reference" icon="code" href="/api-reference/http-endpoints">
-    REST, WebSocket, and MCP endpoints
+    40+ REST, WebSocket, and MCP endpoints
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/architecture/overview">
+    Dual-layer design with 18 ADRs
   </Card>
 </CardGroup>
 
 ## Key Features
 
-- **Voice Pipeline**: STT → LLM → TTS with WebSocket streaming
-- **Multi-Provider AI**: Claude, Ollama, sherpa-onnx — with automatic routing
-- **MCP Integration**: 9 built-in tools + external server connections
-- **Memory System**: Working, episodic, and semantic tiers
-- **Desktop App**: Tauri 2 with system tray and global hotkey
-- **CLI Tools**: `agtos start`, `agtos setup`, `agtos chat`
+- **Voice Pipeline** — STT → LLM → TTS with WebSocket streaming, barge-in, and word-level timestamps
+- **Multi-Provider AI** — Claude, Ollama, sherpa-onnx, OpenRouter — with three-tier model routing
+- **MCP Integration** — 10 built-in tools + external server connections + dynamic tool selection
+- **Memory System** — Working, episodic, and semantic tiers with Dialectic reasoning
+- **Device Registry** — ESP32, browser, and CLI device management with per-device preferences
+- **Web Dashboard** — Real-time health, voice, memory, devices, settings, and logs
+- **Desktop App** — Tauri 2 with system tray, global push-to-talk hotkey, and auto-start
+- **CLI Tools** — `agtos start`, `agtos setup`, `agtos chat`, `agtos doctor`, and more

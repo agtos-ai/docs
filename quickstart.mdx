@@ -5,9 +5,10 @@ description: "Get agtOS running in 5 minutes"
 
 ## Prerequisites
 
-- Node.js 22+
-- (Optional) Docker for voice services
-- (Optional) Claude API key or Max subscription
+- **Node.js 22+** (required)
+- **Docker** (optional, for Redis — enables memory, scheduling, and device management)
+- **Ollama** (optional, enables local AI routing and semantic search)
+- **Claude API key or Max subscription** (optional, for cloud AI)
 
 ## 1. Install
 
@@ -47,16 +48,37 @@ The dashboard and health endpoint are available immediately at `http://localhost
 
 ## 4. Test Chat
 
-```bash
-curl -X POST http://localhost:4102/api/chat \
-  -H 'Content-Type: application/json' \
-  -d '{"text": "Hello, what is 2+2?"}'
-```
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    npx agtos chat
+    # Type your messages in the interactive prompt
+    ```
+  </Tab>
+  <Tab title="curl">
+    ```bash
+    curl -X POST http://localhost:4102/api/chat \
+      -H 'Content-Type: application/json' \
+      -d '{"text": "Hello, what is 2+2?"}'
+    ```
+  </Tab>
+</Tabs>
 
-## 5. (Optional) Start Voice Services
+## 5. (Optional) Enable Memory and Scheduling
 
 ```bash
 docker compose up -d redis
 ```
 
-Then open the dashboard at `http://localhost:4102` and try voice chat.
+With Redis running, you get cross-session memory, task scheduling, device registry, and user preferences.
+
+## 6. Open the Dashboard
+
+Navigate to `http://localhost:4102` for the web dashboard — real-time health monitoring, voice interaction, memory browsing, and system configuration.
+
+## Next Steps
+
+- [Install Ollama](https://ollama.ai) for local AI routing and semantic memory search
+- Run `npx agtos doctor` to verify all dependencies
+- Download voice models: `npx agtos models download --default`
+- See the [CLI Reference](/features/cli) for all available commands

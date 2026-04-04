@@ -5,12 +5,13 @@ description: "Detailed installation guide for all platforms"
 
 ## Requirements
 
-| Component | Version | Required |
-|-----------|---------|----------|
-| Node.js | 22+ | Yes |
-| Docker | Latest | For voice (STT/TTS) |
-| Redis | 7.2+ | For memory, scheduling |
-| Ollama | Latest | For local AI models |
+| Component | Version | Required | Enables |
+|-----------|---------|----------|---------|
+| Node.js | 22+ | **Yes** | Core runtime |
+| Docker | Latest | No | Convenient Redis and service management |
+| Redis | 7.2+ (with RediSearch) | No | Memory, scheduling, devices, user preferences |
+| Ollama | Latest | No | Local AI routing, intent classification, embeddings |
+| Claude API key | -- | No | Cloud AI reasoning (pay-per-token or Max subscription) |
 
 ## Install Methods
 
@@ -48,8 +49,22 @@ Download from [GitHub Releases](https://github.com/agtos-ai/agtos/releases).
 
 ## Ports
 
-| Port | Service |
-|------|---------|
-| 3000 | Voice WebSocket |
-| 4100 | MCP Server |
-| 4102 | Health + API + Dashboard |
+| Port | Service | Protocol |
+|------|---------|----------|
+| 3000 | Voice pipeline | WebSocket (`/audio`), WebRTC signaling (`/webrtc`) |
+| 4100 | MCP server | HTTP (`POST /mcp`) |
+| 4102 | Health, REST API, dashboard, Prometheus metrics | HTTP |
+
+All ports are configurable via environment variables: `VOICE_PORT`, `MCP_PORT`, `HEALTH_PORT`.
+
+## Verify Installation
+
+After starting the server, run diagnostics to verify everything is working:
+
+```bash
+npx agtos doctor
+```
+
+This checks Node.js version, Docker, Redis, Ollama, sherpa-onnx models, API credentials, network connectivity, config file validity, and port availability. Each check reports pass/warn/fail with actionable remediation hints.
+
+See [Troubleshooting](/guides/troubleshooting) for common issues and solutions.

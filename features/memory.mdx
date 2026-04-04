@@ -135,16 +135,37 @@ Semantic memory provides long-term knowledge storage with embedding-based vector
 3. **Semantic retrieval**: When the agent needs context, the current query is embedded and compared against stored memories using cosine similarity
 4. **Relevance threshold**: Only memories above a configurable similarity threshold are included in the LLM context
 
+### Search Modes
+
+The memory system supports three search strategies, configurable via `AGTOS_MEMORY_SEARCH_MODE`:
+
+| Mode | Description | Default |
+|------|-------------|---------|
+| `hybrid` | Combines BM25 keyword matching with vector similarity using reciprocal rank fusion (RRF) | Yes |
+| `vector` | Pure embedding-based semantic search (cosine similarity) | No |
+| `bm25` | Pure keyword/term frequency search | No |
+
+Hybrid mode gives the best results for most queries — it finds exact keyword matches and semantically similar content simultaneously.
+
+<Tip>
+Enable query expansion with `AGTOS_MEMORY_QUERY_EXPANSION=true` to use Ollama to rewrite search queries for better recall. This adds ~50ms latency but can significantly improve results for vague queries.
+</Tip>
+
 ### Embedding Providers
 
-| Provider | Dimensions | Use Case |
-|----------|-----------|----------|
-| Ollama (nomic-embed-text) | 768 | Local/private, no external API calls |
-| MiniLM-L6 | 384 | Lightweight local option |
-| OpenAI text-embedding-3-small | 1536 | Highest quality, requires API key |
+| Provider | Model | Dimensions | Use Case |
+|----------|-------|-----------|----------|
+| Ollama | `nomic-embed-text` | 768 | Local/private, no external API calls (default) |
+| OpenRouter | `openai/text-embedding-3-small` | 1536 | Cloud-based, highest quality |
+
+Configure via:
+```bash
+AGTOS_EMBEDDING_PROVIDER=ollama          # or 'openrouter'
+AGTOS_EMBEDDING_MODEL=nomic-embed-text   # or 'openai/text-embedding-3-small'
+```
 
 <Note>
-Semantic memory requires both Redis (with the RediSearch module) and an embedding provider (Ollama or OpenAI). If either is unavailable, semantic memory falls back to episodic keyword search.
+Semantic memory requires both Redis (with the RediSearch module) and an embedding provider (Ollama or OpenRouter). If either is unavailable, semantic memory falls back to episodic keyword search.
 </Note>
 
 ## Context Assembly
@@ -219,6 +240,24 @@ See [HTTP Endpoints](/api-reference/http-endpoints) for complete request/respons
 
 The memory system builds a user profile from conversation history, tracking the user's name, communication style, behavioral patterns, and preferences. The profile is used to personalize agent responses.
 
+### Dreamer (Memory Consolidation)
+
+The Dreamer is a background process that periodically consolidates episodic memories into higher-level user conclusions. It uses an LLM to synthesize patterns across multiple episodes — for example, noticing that a user consistently asks about weather in the morning and inferring "user is a morning person who checks weather first."
+
+Conclusions have a confidence score (0.0--1.0) and a type:
+
+| Type | Description |
+|------|-------------|
+| `explicit` | Directly stated by the user ("I prefer metric units") |
+| `inferred` | Synthesized from patterns across episodes |
+| `corrected` | Updated after user correction of a previous conclusion |
+
+Configure the Dreamer provider independently:
+```bash
+AGTOS_CONSOLIDATION_PROVIDER=ollama    # or 'claude', 'openrouter'
+AGTOS_CONSOLIDATION_MODEL=llama3       # model for consolidation
+```
+
 ### Dialectic Engine
 
 The Dialectic engine answers questions about the user by synthesizing information from the profile, conclusions, and episodic memories. Use `POST /api/memory/ask` to query it:
@@ -231,10 +270,20 @@ curl -X POST http://localhost:4102/api/memory/ask \
 
 ### Cross-Tool Memory Import
 
-agtOS can import memories from other AI tools (Claude, ChatGPT, etc.) via the import pipeline. The CLI provides a convenient interface:
+agtOS can import memories from other AI tools via the import pipeline. Supported sources:
+
+| Source | What's Imported |
+|--------|----------------|
+| **Claude Code** | Conversation history and project memories |
+| **Cursor** | Editor conversation context |
+| **Windsurf** | AI assistant conversations |
+| **Aider** | Git-based coding conversations |
+| **GitHub Copilot** | Interaction history |
+
+The CLI provides a convenient interface:
 
 ```bash
-# Scan for available sources
+# Scan for available sources and import
 npx agtos memory import
 ```
 

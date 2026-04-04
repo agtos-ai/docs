@@ -148,28 +148,24 @@ If the streaming model is not downloaded, agtOS falls back to batch transcriptio
 
 ## STT (Speech-to-Text)
 
-STT is provided by [speaches](https://github.com/speaches-ai/speaches), an open-source server that exposes an OpenAI-compatible `/v1/audio/transcriptions` endpoint. agtOS connects using the standard OpenAI Node.js SDK.
+STT is provided by sherpa-onnx (default, in-process) or speaches (external server fallback).
 
-Key capabilities:
+### sherpa-onnx STT (Default)
 
-- **GPU-accelerated** inference via CUDA/ROCm (4-6x faster than CPU)
-- **Multiple models**: Whisper large-v3, faster-whisper, distil-whisper
-- **No file I/O**: Audio is streamed over HTTP -- no temp files anywhere in the pipeline
-- **Streaming transcription**: Progressive results while the user is still speaking
-- **Shared with TTS**: The same speaches container handles both STT and TTS
+The default STT provider runs directly in the Node.js process via ONNX Runtime:
 
-```typescript
-// Under the hood, agtOS uses the OpenAI SDK pointed at speaches
-const client = new OpenAI({
-  baseURL: 'http://speaches:8000/v1',
-  apiKey: 'not-needed'
-});
+- **17+ models**: Moonshine, SenseVoice, Zipformer, Paraformer, Whisper
+- **True streaming**: Partial results while the user is still speaking (Zipformer)
+- **Word timestamps**: Per-word timing for transcript display
+- **No network overhead**: In-process inference, no HTTP round-trips
 
-const transcription = await client.audio.transcriptions.create({
-  model: 'whisper-large-v3',
-  file: audioBuffer,
-});
-```
+### speaches STT (Fallback)
+
+[speaches](https://github.com/speaches-ai/speaches) is an external server that exposes an OpenAI-compatible `/v1/audio/transcriptions` endpoint:
+
+- **GPU-accelerated**: CUDA/ROCm inference (4-6x faster than CPU)
+- **Faster Whisper models**: Whisper large-v3, faster-whisper, distil-whisper
+- **Shared container**: Same speaches server handles both STT and TTS
 
 ### VAD Pre-Filtering
 
@@ -181,22 +177,16 @@ Voice Activity Detection runs locally (in the Node.js process or on the ESP32 de
 
 ## TTS (Text-to-Speech)
 
-TTS is also provided by speaches, using the OpenAI-compatible `/v1/audio/speech` endpoint. The default engine is **Kokoro**, which provides a good balance of quality, speed, and resource usage.
+TTS is provided by sherpa-onnx (default, in-process) or speaches (external server fallback). The default model is **Kokoro INT8**, which provides a good balance of quality, speed, and resource usage.
 
 Key capabilities:
 
 - **Sentence-based streaming**: TTS begins on the first complete sentence while the LLM is still generating subsequent sentences, reducing perceived latency
-- **Multiple engines**: Kokoro (default), XTTS v2 (voice cloning), Piper (legacy)
-- **Multiple formats**: Opus (WebRTC streaming), PCM (local processing), MP3, WAV, FLAC
-- **GPU acceleration**: Dramatically lower latency than CPU-only inference
+- **In-process synthesis**: sherpa-onnx runs Kokoro directly in the Node.js process with no network overhead
+- **Thread pool**: Multiple concurrent TTS instances (default: 3) for parallel sentence synthesis
+- **Configurable voice and speed**: `SHERPA_TTS_VOICE=af_heart`, `SHERPA_TTS_SPEED=1.0`
 
-```typescript
-const speech = await client.audio.speech.create({
-  model: 'kokoro',
-  voice: 'af_heart',
-  input: 'Hello! How can I help you today?',
-});
-```
+When using the speaches fallback, TTS uses the OpenAI-compatible `/v1/audio/speech` endpoint with Kokoro ONNX models.
 
 ### Stream Coordinator
 
