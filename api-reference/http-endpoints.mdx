@@ -1416,16 +1416,30 @@ All fields are optional.
 
 <Accordion title="POST /api/credentials">
 
-Store encrypted credentials for a provider. Credentials are encrypted with AES-256-GCM before storage.
+Store encrypted credentials for a provider. Credentials are encrypted with AES-256-GCM before storage. Must provide either `apiKey` or `setupToken`.
+
+<Warning>
+This endpoint is **localhost-only** — requests from non-loopback addresses return `403 Forbidden`. It is designed for the setup wizard and Settings UI running on the same machine.
+</Warning>
 
 ### Request Body
 
+<ParamField body="provider" type="string" required>
+  Provider identifier: `provider-anthropic` or `provider-openai`.
+</ParamField>
+
+<ParamField body="apiKey" type="string">
+  API key (e.g., `sk-ant-api03-...` for Anthropic, `sk-...` for OpenAI). Max 256 chars.
+</ParamField>
+
+<ParamField body="setupToken" type="string">
+  OAuth setup token (e.g., `sk-ant-oat01-...` for Anthropic Max subscription). Max 256 chars.
+</ParamField>
+
 ```json
 {
-  "providerId": "anthropic",
-  "fields": {
-    "apiKey": "sk-ant-api03-your-key"
-  }
+  "provider": "provider-anthropic",
+  "apiKey": "sk-ant-api03-your-key"
 }
 ```
 
@@ -1435,27 +1449,47 @@ Store encrypted credentials for a provider. Credentials are encrypted with AES-2
 
 ```json
 {
-  "stored": true,
-  "providerId": "anthropic"
+  "success": true,
+  "provider": "provider-anthropic"
 }
 ```
 
 **400 Bad Request** -- Validation failure.
 
+**403 Forbidden** -- Request not from localhost.
+
+```json
+{
+  "error": "Credential storage only available from localhost"
+}
+```
+
+**503 Service Unavailable** -- Credential manager not available.
+
 </Accordion>
 
 <Accordion title="POST /api/credentials/validate">
 
-Validate credentials against the actual provider API without storing them. Useful for the setup wizard and Settings UI.
+Validate credentials against the actual provider API without storing them. Useful for the setup wizard and Settings UI. Supports all four providers.
 
 ### Request Body
 
+<ParamField body="provider" type="string" required>
+  Provider to validate: `provider-anthropic`, `provider-openai`, `provider-ollama`, or `provider-openrouter`.
+</ParamField>
+
+<ParamField body="apiKey" type="string">
+  API key to validate. Max 256 chars.
+</ParamField>
+
+<ParamField body="setupToken" type="string">
+  OAuth token to validate. Max 256 chars.
+</ParamField>
+
 ```json
 {
-  "providerId": "anthropic",
-  "fields": {
-    "apiKey": "sk-ant-api03-your-key"
-  }
+  "provider": "provider-anthropic",
+  "apiKey": "sk-ant-api03-your-key"
 }
 ```
 
@@ -1466,16 +1500,20 @@ Validate credentials against the actual provider API without storing them. Usefu
 ```json
 {
   "valid": true,
-  "message": "API key is valid (Claude Haiku 4.5 responded)"
+  "provider": "provider-anthropic",
+  "reason": "API key is valid (Claude Haiku 4.5 responded)"
 }
 ```
 
 ```json
 {
   "valid": false,
-  "message": "Invalid API key: 401 Unauthorized"
+  "provider": "provider-anthropic",
+  "reason": "Invalid API key: 401 Unauthorized"
 }
 ```
+
+**400 Bad Request** -- Missing or invalid fields.
 
 </Accordion>
 
@@ -1496,6 +1534,42 @@ Check all optional system dependencies (Node.js, Docker, Ollama, Redis, sherpa-o
   "ollama": { "installed": true, "reachable": true },
   "redis": { "installed": true, "reachable": true },
   "sherpaModels": { "downloaded": 3, "total": 5 }
+}
+```
+
+</Accordion>
+
+<Accordion title="POST /api/dependencies/install-redis">
+
+Install and start Redis via Docker. Creates a `redis/redis-stack:latest` container with port 6379 exposed and `unless-stopped` restart policy.
+
+### Response
+
+**200 OK** -- Redis installed, started, or already running.
+
+```json
+{
+  "status": "installed"
+}
+```
+
+Possible `status` values: `installed` (new container created), `started` (existing container started), `already_running` (no action needed).
+
+**400 Bad Request** -- Docker is not running.
+
+```json
+{
+  "error": "Docker is not running",
+  "hint": "Start Docker Desktop or run 'sudo systemctl start docker'"
+}
+```
+
+**500 Internal Server Error** -- Installation failed.
+
+```json
+{
+  "error": "Failed to install Redis",
+  "details": "docker: Error response from daemon..."
 }
 ```
 
@@ -1750,8 +1824,9 @@ API key authentication is **opt-in**. When the `AGTOS_API_KEY` environment varia
 
 These paths do **not** require authentication:
 
-- `GET /health` (and sub-paths)
-- `GET /metrics`
+- `GET /health` (and sub-paths like `/health/metrics`, `/health/:serviceName`)
+- `GET /metrics` (Prometheus endpoint)
+- `POST /api/credentials` (localhost-only, needed during onboarding setup)
 
 ## Rate Limiting
 
@@ -1762,7 +1837,7 @@ All API endpoints are rate-limited using a token bucket algorithm.
 | Scope | Limit | Configurable Via |
 |-------|-------|-----------------|
 | General API (`/api/*`) | 100 requests/min | `API_RATE_LIMIT` |
-| Chat + Tasks (`/api/chat`, `/api/tasks`) | 20 requests/min | `CHAT_RATE_LIMIT` |
+| Chat, Tasks, Credentials (`/api/chat`, `/api/tasks`, `/api/credentials`) | 20 requests/min | `CHAT_RATE_LIMIT` |
 
 ### Rate Limit Headers
 
