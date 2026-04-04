@@ -11,26 +11,33 @@
   "topbarLinks": [
     { "name": "GitHub", "url": "https://github.com/agtos-ai/agtos" }
   ],
+  "tabs": [
+    { "name": "Documentation", "url": "introduction" },
+    { "name": "Features", "url": "features/voice-pipeline" },
+    { "name": "API Reference", "url": "api-reference/introduction" },
+    { "name": "Architecture", "url": "architecture/overview" }
+  ],
   "navigation": {
     "tabs": [
       {
-        "tab": "Getting Started",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Introduction",
+            "group": "Getting Started",
             "pages": ["introduction", "quickstart", "installation"]
-          }
-        ]
-      },
-      {
-        "tab": "Configuration",
-        "groups": [
+          },
           {
-            "group": "Setup",
+            "group": "Configuration",
             "pages": [
               "configuration/authentication",
               "configuration/providers",
               "configuration/environment"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/troubleshooting"
             ]
           }
         ]
@@ -39,19 +46,24 @@
         "tab": "Features",
         "groups": [
           {
-            "group": "Core",
+            "group": "Voice & Chat",
             "pages": [
               "features/voice-pipeline",
               "features/chat",
-              "features/memory",
-              "features/mcp",
-              "features/cli"
+              "features/memory"
             ]
           },
           {
-            "group": "Platform",
+            "group": "Tools & Integration",
             "pages": [
-              "features/devices",
+              "features/mcp",
+              "features/cli",
+              "features/devices"
+            ]
+          },
+          {
+            "group": "Applications",
+            "pages": [
               "features/dashboard",
               "features/desktop"
             ]
@@ -66,7 +78,7 @@
             "pages": ["api-reference/introduction"]
           },
           {
-            "group": "Endpoints",
+            "group": "Protocols",
             "pages": [
               "api-reference/http-endpoints",
               "api-reference/websocket",
@@ -79,21 +91,10 @@
         "tab": "Architecture",
         "groups": [
           {
-            "group": "Design",
+            "group": "System Design",
             "pages": [
               "architecture/overview",
               "architecture/decisions"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Guides",
-        "groups": [
-          {
-            "group": "Help",
-            "pages": [
-              "guides/troubleshooting"
             ]
           }
         ]

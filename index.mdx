@@ -3,38 +3,76 @@ title: "agtOS"
 description: "Voice-native AI agent platform"
 ---
 
-# Welcome to agtOS
+# agtOS Documentation
 
-agtOS is an open-source, voice-native AI agent platform — the infrastructure for AI agents that can hear, speak, think, and act.
+agtOS is an open-source, voice-native AI agent platform. It provides the infrastructure for AI agents that can **hear**, **speak**, **think**, and **act** — connecting voice input/output with LLM reasoning, tool execution, and persistent memory.
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Get running in 5 minutes
-  </Card>
-  <Card title="Installation" icon="download" href="/installation">
-    Detailed setup for all platforms
-  </Card>
-  <Card title="Authentication" icon="key" href="/configuration/authentication">
-    Configure Claude API key or Max subscription
+    Get agtOS running in 5 minutes with a step-by-step guide.
   </Card>
   <Card title="CLI Reference" icon="terminal" href="/features/cli">
-    9 commands for managing agtOS from the terminal
+    9 commands for managing agtOS — start, setup, chat, doctor, and more.
   </Card>
-  <Card title="API Reference" icon="code" href="/api-reference/http-endpoints">
-    40+ REST, WebSocket, and MCP endpoints
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    40+ REST endpoints, WebSocket voice protocol, and 10 MCP tools.
   </Card>
   <Card title="Architecture" icon="sitemap" href="/architecture/overview">
-    Dual-layer design with 18 ADRs
+    Dual-layer design, three-tier model routing, and 18 ADRs.
   </Card>
 </CardGroup>
 
-## Key Features
+---
 
-- **Voice Pipeline** — STT → LLM → TTS with WebSocket streaming, barge-in, and word-level timestamps
-- **Multi-Provider AI** — Claude, Ollama, sherpa-onnx, OpenRouter — with three-tier model routing
-- **MCP Integration** — 10 built-in tools + external server connections + dynamic tool selection
-- **Memory System** — Working, episodic, and semantic tiers with Dialectic reasoning
-- **Device Registry** — ESP32, browser, and CLI device management with per-device preferences
-- **Web Dashboard** — Real-time health, voice, memory, devices, settings, and logs
-- **Desktop App** — Tauri 2 with system tray, global push-to-talk hotkey, and auto-start
-- **CLI Tools** — `agtos start`, `agtos setup`, `agtos chat`, `agtos doctor`, and more
+## How it works
+
+```
+Voice In → VAD → STT → Model Router → Claude / Ollama → TTS → Voice Out
+                              ↓
+                     Agent Loop → Tool Registry → MCP Tools
+                              ↓
+                     Memory (Working + Episodic + Semantic)
+```
+
+agtOS processes voice through a **cascade pipeline**: speech is transcribed, routed to the best model (local or cloud), processed through an agent reasoning loop with tool access, and synthesized back to speech — all with sub-second perceived latency.
+
+---
+
+## Core capabilities
+
+<CardGroup cols={3}>
+  <Card title="Voice Pipeline" icon="microphone">
+    STT → LLM → TTS cascade with barge-in, word timestamps, and streaming partial transcripts. In-process via sherpa-onnx.
+  </Card>
+  <Card title="Model Routing" icon="route">
+    Three-tier routing: intent classification (local), simple queries (Ollama), complex reasoning (Claude). Privacy-aware.
+  </Card>
+  <Card title="Agent Memory" icon="brain">
+    Working (session), episodic (Redis), and semantic (vector search) tiers. Dialectic reasoning and cross-tool import.
+  </Card>
+  <Card title="MCP Integration" icon="plug">
+    10 built-in tools + external server connections. Dynamic tool selection reduces context usage by 80-90%.
+  </Card>
+  <Card title="Multi-Platform" icon="display">
+    Web dashboard, Tauri 2 desktop app with system tray, CLI, ESP32 hardware, and browser voice client.
+  </Card>
+  <Card title="Local-First" icon="shield-check">
+    In-process STT/TTS/VAD via ONNX. Local model routing via Ollama. Cloud is optional, not required.
+  </Card>
+</CardGroup>
+
+---
+
+## Choose your path
+
+<CardGroup cols={3}>
+  <Card title="I want to try it" icon="play" href="/quickstart">
+    Install, configure, and chat in 5 minutes.
+  </Card>
+  <Card title="I want to build with it" icon="code" href="/api-reference/introduction">
+    REST API, WebSocket protocol, and MCP tool schemas.
+  </Card>
+  <Card title="I want to understand it" icon="book-open" href="/architecture/overview">
+    System design, data flow, and architectural decisions.
+  </Card>
+</CardGroup>

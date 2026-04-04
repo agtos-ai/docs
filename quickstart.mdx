@@ -3,82 +3,134 @@ title: "Quickstart"
 description: "Get agtOS running in 5 minutes"
 ---
 
+Get from zero to a working agtOS instance in 5 minutes.
+
 ## Prerequisites
 
-- **Node.js 22+** (required)
-- **Docker** (optional, for Redis — enables memory, scheduling, and device management)
-- **Ollama** (optional, enables local AI routing and semantic search)
-- **Claude API key or Max subscription** (optional, for cloud AI)
+- **Node.js 22+** ([download](https://nodejs.org))
+- **A Claude API key** or **Max subscription** (optional — enables cloud AI)
 
-## 1. Install
-
-```bash
-git clone https://github.com/agtos-ai/agtos.git
-cd agtos
-npm install
-```
-
-## 2. Configure Authentication
-
-<Tabs>
-  <Tab title="API Key (pay-per-token)">
+<Steps>
+  <Step title="Clone and install">
     ```bash
-    echo "ANTHROPIC_API_KEY=sk-ant-api03-your-key" >> .env.local
+    git clone https://github.com/agtos-ai/agtos.git
+    cd agtos
+    npm install
     ```
-    Get your key from [console.anthropic.com](https://console.anthropic.com)
-  </Tab>
-  <Tab title="Max Subscription (flat rate)">
+  </Step>
+
+  <Step title="Run the setup wizard">
+    The wizard checks dependencies, prompts for API keys, and validates them against the actual provider API:
+
     ```bash
-    claude setup-token
-    # Copy the token, then:
-    echo "ANTHROPIC_AUTH_TOKEN=sk-ant-oat01-your-token" >> .env.local
+    npx agtos setup
     ```
-    agtOS spawns the `claude` CLI as a subprocess — no external proxy needed.
-  </Tab>
-</Tabs>
 
-## 3. Start the Server
+    <Tabs>
+      <Tab title="API Key (pay-per-token)">
+        Enter your `sk-ant-api03-...` key from [console.anthropic.com](https://console.anthropic.com).
+      </Tab>
+      <Tab title="Max Subscription (flat rate)">
+        Run `claude setup-token`, then enter the `sk-ant-oat01-...` token.
+      </Tab>
+      <Tab title="No API key">
+        Press Enter to skip. agtOS still works for local-only use with Ollama.
+      </Tab>
+    </Tabs>
+  </Step>
 
-```bash
-npx agtos setup   # First-run: validates API keys against provider API
-npx agtos start   # Starts server with progress feedback
-```
+  <Step title="Download voice models">
+    Download the default speech models for the in-process voice engine (~460MB):
 
-The dashboard and health endpoint are available immediately at `http://localhost:4102/health`.
-
-## 4. Test Chat
-
-<Tabs>
-  <Tab title="CLI">
     ```bash
-    npx agtos chat
-    # Type your messages in the interactive prompt
+    npx agtos models download --default
     ```
-  </Tab>
-  <Tab title="curl">
-    ```bash
-    curl -X POST http://localhost:4102/api/chat \
-      -H 'Content-Type: application/json' \
-      -d '{"text": "Hello, what is 2+2?"}'
-    ```
-  </Tab>
-</Tabs>
 
-## 5. (Optional) Enable Memory and Scheduling
+    <Info>
+    This step is optional. Without models, agtOS runs in text-only mode. Voice features activate automatically when models are available.
+    </Info>
+  </Step>
+
+  <Step title="Start the server">
+    ```bash
+    npx agtos start
+    ```
+
+    You'll see startup progress for each service:
+
+    ```
+      ✓ Health endpoint
+      ✓ Voice pipeline
+      ✓ MCP server
+      ✓ Task scheduler
+      ✓ API routes
+
+    agtOS server is running!
+      Dashboard:  http://localhost:4102
+      Health:     http://localhost:4102/health
+      Voice WS:   ws://localhost:3000/audio
+      MCP:        http://localhost:4100/mcp
+    ```
+  </Step>
+
+  <Step title="Try it out">
+    <Tabs>
+      <Tab title="CLI chat">
+        ```bash
+        npx agtos chat
+        ```
+        Type messages in the interactive prompt. Use `/help` for commands, `/quit` to exit.
+      </Tab>
+      <Tab title="curl">
+        ```bash
+        curl -X POST http://localhost:4102/api/chat \
+          -H "Content-Type: application/json" \
+          -d '{"text": "Hello, what can you do?"}'
+        ```
+      </Tab>
+      <Tab title="Dashboard">
+        Open `http://localhost:4102` in your browser for the web dashboard with voice interaction, memory browsing, and system management.
+      </Tab>
+      <Tab title="Claude Desktop">
+        Add agtOS as an MCP server in `claude_desktop_config.json`:
+
+        ```json
+        {
+          "mcpServers": {
+            "agtos": { "url": "http://localhost:4100/mcp" }
+          }
+        }
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+</Steps>
+
+## Optional: Enable memory and scheduling
+
+Start Redis for cross-session memory, task scheduling, device registry, and user preferences:
 
 ```bash
 docker compose up -d redis
 ```
 
-With Redis running, you get cross-session memory, task scheduling, device registry, and user preferences.
+<Tip>
+No Docker? Run `npx agtos doctor` to check all dependencies and get remediation hints for anything missing.
+</Tip>
 
-## 6. Open the Dashboard
+## What's next?
 
-Navigate to `http://localhost:4102` for the web dashboard — real-time health monitoring, voice interaction, memory browsing, and system configuration.
-
-## Next Steps
-
-- [Install Ollama](https://ollama.ai) for local AI routing and semantic memory search
-- Run `npx agtos doctor` to verify all dependencies
-- Download voice models: `npx agtos models download --default`
-- See the [CLI Reference](/features/cli) for all available commands
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/configuration/authentication">
+    Configure providers, models, and advanced options.
+  </Card>
+  <Card title="Voice Pipeline" icon="microphone" href="/features/voice-pipeline">
+    Learn about audio modes, STT/TTS providers, and streaming.
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/features/cli">
+    All 9 commands with flags, examples, and behavior details.
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    40+ REST endpoints, WebSocket protocol, and MCP tools.
+  </Card>
+</CardGroup>

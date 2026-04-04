@@ -1,36 +1,94 @@
 ---
 title: "API Overview"
-description: "agtOS exposes three protocol interfaces"
+description: "Three protocol interfaces for interacting with agtOS"
 ---
 
-# API Reference
+agtOS exposes three protocol interfaces. Each serves a different use case — pick the one that fits your integration.
 
-agtOS provides three ways to interact with the platform:
+<CardGroup cols={3}>
+  <Card title="REST API" icon="server" href="/api-reference/http-endpoints">
+    **Port 4102** — 40+ endpoints
 
-| Protocol | Port | Use Case |
-|----------|------|----------|
-| **REST API** | 4102 | Dashboard, CLI, health checks, chat |
-| **WebSocket** | 3000 | Real-time voice audio streaming |
-| **MCP** | 4100 | Tool integration for AI agents |
+    Health, chat, memory, scheduling, devices, configuration, and Prometheus metrics. Used by the CLI, dashboard, and external integrations.
+  </Card>
+  <Card title="WebSocket" icon="wave-sine" href="/api-reference/websocket">
+    **Port 3000** — Real-time audio
+
+    Bidirectional PCM audio streaming with session management, transcripts, word timestamps, and TTS playback.
+  </Card>
+  <Card title="MCP Tools" icon="wrench" href="/api-reference/mcp-tools">
+    **Port 4100** — 10 built-in tools
+
+    Voice, system, memory, workflow, and scheduling tools via Streamable HTTP. Connect from Claude Desktop, Cursor, or any MCP client.
+  </Card>
+</CardGroup>
 
 ## Authentication
 
-API endpoints support optional authentication via `AGTOS_API_KEY`:
+All API endpoints support **opt-in** authentication via the `AGTOS_API_KEY` environment variable.
 
-```bash
-curl -H "Authorization: Bearer your-api-key" http://localhost:4102/api/health
+<Tabs>
+  <Tab title="Enabled (production)">
+    When `AGTOS_API_KEY` is set, all `/api/*` endpoints require a Bearer token:
+
+    ```bash
+    curl -H "Authorization: Bearer your-api-key" \
+      http://localhost:4102/api/health
+    ```
+
+    Health endpoints (`/health`, `/metrics`) remain open for monitoring.
+  </Tab>
+  <Tab title="Disabled (development)">
+    When `AGTOS_API_KEY` is not set, all endpoints are open:
+
+    ```bash
+    curl http://localhost:4102/api/health
+    ```
+
+    This is the default for local development.
+  </Tab>
+</Tabs>
+
+## Rate limiting
+
+All API endpoints use token bucket rate limiting per client IP:
+
+| Scope | Default | Environment Variable |
+|-------|---------|---------------------|
+| General API (`/api/*`) | 100 req/min | `API_RATE_LIMIT` |
+| Chat, Tasks, Credentials | 20 req/min | `CHAT_RATE_LIMIT` |
+
+Rate limit headers are included on every response:
+
+```
+X-RateLimit-Remaining: 98
 ```
 
-When `AGTOS_API_KEY` is not set, all endpoints are open (local development mode).
+## Quick examples
 
-<CardGroup cols={3}>
-  <Card title="REST Endpoints" icon="server" href="/api-reference/http-endpoints">
-    40+ HTTP endpoints for health, chat, sessions, memory, scheduling, devices, credentials, config, and Prometheus metrics
-  </Card>
-  <Card title="WebSocket" icon="wave-sine" href="/api-reference/websocket">
-    Real-time audio streaming with push-to-talk, VAD, transcripts, and word timestamps
-  </Card>
-  <Card title="MCP Tools" icon="wrench" href="/api-reference/mcp-tools">
-    10 built-in tools: voice, system, memory, workflows, scheduling, and dynamic discovery
-  </Card>
-</CardGroup>
+<CodeGroup>
+
+```bash Health check
+curl http://localhost:4102/api/health
+```
+
+```bash Send a chat message
+curl -X POST http://localhost:4102/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"text": "What time is it?"}'
+```
+
+```bash Search memory
+curl "http://localhost:4102/api/memory/search?q=weather&limit=5"
+```
+
+```bash Connect MCP (Claude Desktop)
+# claude_desktop_config.json
+{
+  "mcpServers": {
+    "agtos": { "url": "http://localhost:4100/mcp" }
+  }
+}
+```
+
+</CodeGroup>

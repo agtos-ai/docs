@@ -1,57 +1,85 @@
 ---
-title: "Introduction"
-description: "agtOS — Voice-native AI agent platform"
+title: "What is agtOS?"
+description: "An introduction to the agtOS voice-native AI agent platform"
 ---
 
-# What is agtOS?
+agtOS is an open-source platform that turns AI models into voice-enabled agents. It handles the hard parts — real-time audio processing, model routing, tool execution, and persistent memory — so you can focus on building experiences.
 
-agtOS is an open-source, voice-native AI agent platform. It provides the infrastructure layer for AI agents that can hear, speak, think, and act — connecting voice input/output with LLM reasoning and tool execution.
-
-## Key Features
+## What makes agtOS different
 
 <CardGroup cols={2}>
-  <Card title="Voice Pipeline" icon="microphone">
-    STT → LLM → TTS cascade with WebSocket streaming, word timestamps, and barge-in support
+  <Card title="Voice-native, not voice-added" icon="waveform-lines">
+    Built from the ground up for voice. The cascade pipeline (STT → LLM → TTS) runs with sub-second latency, sentence-level streaming, and barge-in support.
   </Card>
-  <Card title="Multi-Provider AI" icon="brain">
-    Claude (API key + Max subscription), Ollama (local), model routing with automatic fallback
+  <Card title="Local-first architecture" icon="shield-check">
+    In-process speech engine (sherpa-onnx), local model routing (Ollama), and optional cloud. Works offline — cloud is an enhancement, not a dependency.
   </Card>
-  <Card title="MCP Integration" icon="plug">
-    10 built-in MCP tools + external server connections + dynamic tool selection
+  <Card title="Protocol-agnostic" icon="plug">
+    Built on MCP (Model Context Protocol) with A2A readiness. Tools are defined once and work across voice, chat, CLI, and external AI clients.
   </Card>
-  <Card title="Memory System" icon="database">
-    Three-tier: working (per-session), episodic (Redis), semantic (vector search)
-  </Card>
-  <Card title="Desktop App" icon="desktop">
-    Tauri 2 native shell with system tray, global hotkey, auto-update
-  </Card>
-  <Card title="Task Scheduling" icon="clock">
-    Redis-backed cron, once, and interval task execution
+  <Card title="Progressive infrastructure" icon="layer-group">
+    Start with just Node.js. Add Redis for memory and scheduling. Add Ollama for local AI. Each piece unlocks more capabilities without breaking what works.
   </Card>
 </CardGroup>
 
-## Architecture
-
-agtOS uses a dual-layer architecture:
-
-- **Infrastructure Layer**: Voice pipeline, audio processing, WebSocket transport
-- **Orchestration Layer**: AI-driven via protocol gateway (MCP + A2A ready)
+## System overview
 
 ```
-User Voice → STT (sherpa-onnx) → Model Router → Claude/Ollama → TTS → Speaker
-                                    ↓
-                              Agent Loop → Tool Registry → MCP Tools
-                                    ↓
-                           Memory (Working + Episodic + Semantic)
+┌─────────────────────────────────────────────────────────────┐
+│                     agtOS Server                            │
+│                                                             │
+│  :3000 Voice          :4100 MCP           :4102 API         │
+│  ┌──────────┐         ┌──────────┐        ┌──────────┐     │
+│  │WebSocket │         │Streamable│        │REST API  │     │
+│  │Audio     │         │HTTP      │        │Dashboard │     │
+│  │WebRTC   │         │10 Tools  │        │Metrics   │     │
+│  └──────────┘         └──────────┘        └──────────┘     │
+│        │                    │                   │           │
+│        └────────────┬───────┴───────────────────┘           │
+│                     │                                       │
+│              ┌──────┴──────┐                                │
+│              │ Orchestrator │                                │
+│              │              │                                │
+│              │ Model Router │◄── Ollama (local)              │
+│              │ Agent Loop   │◄── Claude (cloud)              │
+│              │ Tool Registry│◄── External MCP servers        │
+│              │ Memory       │◄── Redis (sessions, vectors)   │
+│              └─────────────┘                                │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Getting Started
+## Key components
+
+| Component | What it does | Required? |
+|-----------|-------------|-----------|
+| **Voice Pipeline** | STT, TTS, VAD — in-process or external | Included |
+| **Model Router** | Routes requests to the best model (local or cloud) | Included |
+| **Agent Loop** | Multi-step tool execution with progress streaming | Included |
+| **Memory System** | Working, episodic, and semantic memory tiers | Working always; episodic/semantic need Redis |
+| **MCP Server** | Exposes 10 tools to external AI clients | Included |
+| **MCP Client** | Connects to external MCP servers for tool discovery | Included |
+| **Device Registry** | Manages ESP32, browser, CLI, and custom devices | Needs Redis |
+| **Task Scheduler** | Cron, one-time, and interval task scheduling | Needs Redis |
+| **Web Dashboard** | 11-page management UI | Included |
+| **Desktop App** | Tauri 2 with system tray and global PTT hotkey | Separate download |
+| **CLI** | 9 commands for setup, management, and interaction | Included |
+
+## Requirements
+
+| Component | Version | Purpose |
+|-----------|---------|---------|
+| **Node.js** | 22+ | Required runtime |
+| **Redis** | 7.2+ with RediSearch | Memory, scheduling, devices (optional) |
+| **Ollama** | Latest | Local AI models and embeddings (optional) |
+| **Docker** | Latest | Convenient Redis management (optional) |
+
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Get running in 5 minutes
+    Install and run agtOS in 5 minutes.
   </Card>
   <Card title="Installation" icon="download" href="/installation">
-    Detailed setup guide
+    Detailed setup for all platforms and methods.
   </Card>
 </CardGroup>

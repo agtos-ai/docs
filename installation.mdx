@@ -1,51 +1,61 @@
 ---
 title: "Installation"
-description: "Detailed installation guide for all platforms"
+description: "Detailed installation guide for all platforms and methods"
 ---
 
 ## Requirements
 
-| Component | Version | Required | Enables |
-|-----------|---------|----------|---------|
-| Node.js | 22+ | **Yes** | Core runtime |
-| Docker | Latest | No | Convenient Redis and service management |
-| Redis | 7.2+ (with RediSearch) | No | Memory, scheduling, devices, user preferences |
-| Ollama | Latest | No | Local AI routing, intent classification, embeddings |
-| Claude API key | -- | No | Cloud AI reasoning (pay-per-token or Max subscription) |
+| Component | Version | Required | What it enables |
+|-----------|---------|----------|-----------------|
+| **Node.js** | 22+ | Yes | Core runtime |
+| **Docker** | Latest | No | Convenient Redis and service management |
+| **Redis** | 7.2+ with RediSearch | No | Memory, scheduling, devices, user preferences |
+| **Ollama** | Latest | No | Local AI routing, intent classification, embeddings |
 
-## Install Methods
+## Install methods
 
-### npm (Development)
+<Tabs>
+  <Tab title="npm (development)">
+    ```bash
+    git clone https://github.com/agtos-ai/agtos.git
+    cd agtos
+    npm install
+    ```
 
-```bash
-git clone https://github.com/agtos-ai/agtos.git
-cd agtos
-npm install
-```
+    Then run `npx agtos setup` for interactive configuration.
+  </Tab>
+  <Tab title="CLI (global)">
+    ```bash
+    npm install -g agtos
+    agtos setup    # Interactive configuration
+    agtos start    # Start the server
+    ```
+  </Tab>
+  <Tab title="Docker">
+    ```bash
+    git clone https://github.com/agtos-ai/agtos.git
+    cd agtos
+    docker compose up -d
+    ```
 
-### CLI (Global)
+    This starts agtOS, Redis, and speaches (STT/TTS fallback server) together. For GPU-accelerated speech processing:
 
-```bash
-npm install -g agtos
-agtos setup    # Interactive configuration
-agtos start    # Start the server
-```
+    ```bash
+    docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+    ```
+  </Tab>
+  <Tab title="Desktop App">
+    Download the native app from [GitHub Releases](https://github.com/agtos-ai/agtos/releases):
 
-The setup wizard validates API keys against the actual provider API and supports both:
-- **API key** (`sk-ant-api03-...`) — pay-per-token from console.anthropic.com
-- **Max subscription** (`sk-ant-oat01-...`) — flat-rate Claude subscription
+    | Platform | Format | Architecture |
+    |----------|--------|-------------|
+    | macOS | `.dmg` | Apple Silicon + Intel |
+    | Linux | `.AppImage`, `.deb` | x86\_64 |
+    | Windows | `.msi` | x86\_64 |
 
-Run `agtos doctor` to check system dependencies and credential status.
-
-### Docker
-
-```bash
-docker compose up -d
-```
-
-### Desktop App
-
-Download from [GitHub Releases](https://github.com/agtos-ai/agtos/releases).
+    The desktop app bundles the agtOS backend — no Node.js required.
+  </Tab>
+</Tabs>
 
 ## Ports
 
@@ -53,18 +63,32 @@ Download from [GitHub Releases](https://github.com/agtos-ai/agtos/releases).
 |------|---------|----------|
 | 3000 | Voice pipeline | WebSocket (`/audio`), WebRTC signaling (`/webrtc`) |
 | 4100 | MCP server | HTTP (`POST /mcp`) |
-| 4102 | Health, REST API, dashboard, Prometheus metrics | HTTP |
+| 4102 | Health, REST API, dashboard, metrics | HTTP |
 
-All ports are configurable via environment variables: `VOICE_PORT`, `MCP_PORT`, `HEALTH_PORT`.
+All ports are configurable via `VOICE_PORT`, `MCP_PORT`, and `HEALTH_PORT`.
 
-## Verify Installation
-
-After starting the server, run diagnostics to verify everything is working:
+## Verify installation
 
 ```bash
 npx agtos doctor
 ```
 
-This checks Node.js version, Docker, Redis, Ollama, sherpa-onnx models, API credentials, network connectivity, config file validity, and port availability. Each check reports pass/warn/fail with actionable remediation hints.
+The doctor command runs 12 diagnostic checks and reports pass/warn/fail for each:
 
-See [Troubleshooting](/guides/troubleshooting) for common issues and solutions.
+- Node.js version, Docker, Redis, Ollama, speech models
+- API credentials (validated against actual provider APIs)
+- Network connectivity, config file, port availability
+- Feature degradation summary
+
+See [Troubleshooting](/guides/troubleshooting) if anything fails.
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Step-by-step guide from install to first chat.
+  </Card>
+  <Card title="Authentication" icon="key" href="/configuration/authentication">
+    Set up Claude API key or Max subscription.
+  </Card>
+</CardGroup>
