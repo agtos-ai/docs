@@ -1,11 +1,11 @@
 ---
 title: "Authentication"
-description: "Configure Claude API access — standard key or Max subscription"
+description: "Configure AI provider API keys for cloud inference"
 ---
 
-agtOS supports two authentication methods for Claude. Both can coexist — the system auto-detects the token format.
+agtOS uses API keys to authenticate with cloud AI providers. You can configure one or both providers — the system uses whichever is selected via `AGTOS_CLOUD_PROVIDER`.
 
-## Option A: Standard API Key
+## Anthropic (Claude)
 
 Pay-per-token billing from [console.anthropic.com](https://console.anthropic.com).
 
@@ -18,35 +18,46 @@ ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
 - Sent via `X-Api-Key` HTTP header
 - Direct SDK connection to `api.anthropic.com`
 
-## Option B: Max/Pro Subscription
+## OpenAI
 
-Flat monthly rate using your Claude subscription via the `claude` CLI.
+Pay-per-token billing from [platform.openai.com](https://platform.openai.com).
 
 ```bash
-# Generate token
-claude setup-token
-
 # .env.local
-ANTHROPIC_AUTH_TOKEN=sk-ant-oat01-your-token-here
+OPENAI_API_KEY=sk-your-key-here
 ```
 
-- Token prefix: `sk-ant-oat01-`
-- agtOS spawns the `claude` CLI as a subprocess
-- No external proxy needed — the CLI handles OAuth
+- Token prefix: `sk-`
+- Used via OpenAI Node SDK v6
+- Supports GPT-4o and GPT-4o Mini
+
+## Cloud Provider Selection
+
+Set which provider the model router uses for Tier 3 (cloud) inference:
+
+```bash
+# .env.local
+AGTOS_CLOUD_PROVIDER=claude   # default — use Anthropic Claude
+# AGTOS_CLOUD_PROVIDER=openai # alternative — use OpenAI GPT-4o
+```
+
+When both API keys are configured, only the selected provider is used for the main chat/voice pipeline. The other key can still be used by cognitive task providers independently.
+
+## Claude Transport Options
+
+By default, agtOS connects to the Anthropic API directly via the SDK. You can optionally spawn the `claude` CLI binary as a subprocess:
+
+```bash
+# .env.local
+AGTOS_CLAUDE_TRANSPORT=sdk   # default — direct API via Anthropic SDK
+# AGTOS_CLAUDE_TRANSPORT=cli # alternative — spawn claude CLI binary
+```
+
+When using CLI transport, the `ANTHROPIC_API_KEY` is passed to the subprocess as an environment variable.
 
 <Note>
-The `claude` CLI must be installed and on your PATH. Install from [claude.ai/download](https://claude.ai/download).
+CLI transport requires the `claude` CLI to be installed and on your PATH. Install from [claude.ai/download](https://claude.ai/download).
 </Note>
-
-## Auto-Detection
-
-agtOS checks env vars in this priority order:
-1. `ANTHROPIC_AUTH_TOKEN` / `CLAUDE_CODE_OAUTH_TOKEN` → CLI transport
-2. `ANTHROPIC_API_KEY` / `CLAUDE_API_KEY` → SDK transport
-
-The token prefix determines the auth method:
-- `sk-ant-oat` → Bearer auth (CLI subprocess)
-- `sk-ant-api` → API key auth (direct SDK)
 
 ## Advanced Options
 
@@ -62,11 +73,22 @@ CLAUDE_SERVICE_TIER=auto  # auto or standard_only
 ANTHROPIC_BASE_URL=http://localhost:8317
 ```
 
+## Endpoint Authentication
+
+Optionally protect all `/api/*` routes with a Bearer token:
+
+```bash
+# .env.local
+AGTOS_API_KEY=your-secret-api-key
+```
+
+When set, all API requests must include `Authorization: Bearer <key>`. Uses timing-safe SHA-256 comparison. When unset, endpoints are open (suitable for local development).
+
 ## What's next
 
 <CardGroup cols={2}>
   <Card title="Providers" icon="brain" href="/configuration/providers">
-    Configure Claude, Ollama, sherpa-onnx, and the model router.
+    Configure Claude, OpenAI, Ollama, sherpa-onnx, and the model router.
   </Card>
   <Card title="Environment Variables" icon="list" href="/configuration/environment">
     Complete reference for all configuration options.

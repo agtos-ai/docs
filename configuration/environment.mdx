@@ -48,15 +48,22 @@ The Tauri desktop app and web dashboard connect to the same ports via localhost.
 
 | Variable | Default | Description |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | -- | Standard API key (`sk-ant-api03-` prefix). Pay-per-token billing. |
-| `ANTHROPIC_AUTH_TOKEN` | -- | Max/Pro subscription OAuth token (`sk-ant-oat01-` prefix). Uses `claude` CLI subprocess. |
-| `CLAUDE_CODE_OAUTH_TOKEN` | -- | Alias for `ANTHROPIC_AUTH_TOKEN` |
-| `CLAUDE_API_KEY` | -- | Legacy alias for `ANTHROPIC_API_KEY`. Auto-detected by token prefix. |
+| `ANTHROPIC_API_KEY` | -- | API key (`sk-ant-api03-` prefix). Pay-per-token billing from [console.anthropic.com](https://console.anthropic.com). |
+| `CLAUDE_API_KEY` | -- | Legacy alias for `ANTHROPIC_API_KEY` |
 | `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Custom API endpoint (for proxies or CLI transport) |
 
-Token priority order:
-1. `ANTHROPIC_AUTH_TOKEN` / `CLAUDE_CODE_OAUTH_TOKEN` -- CLI transport
-2. `ANTHROPIC_API_KEY` / `CLAUDE_API_KEY` -- SDK transport
+### OpenAI
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENAI_API_KEY` | -- | OpenAI API key (`sk-` prefix). Pay-per-token billing from [platform.openai.com](https://platform.openai.com). |
+
+### Cloud Provider Selection
+
+| Variable | Default | Description |
+|---|---|---|
+| `AGTOS_CLOUD_PROVIDER` | `claude` | Primary cloud AI provider for the model router: `claude` or `openai` |
+| `AGTOS_CLAUDE_TRANSPORT` | `sdk` | Claude transport mode: `sdk` (direct API) or `cli` (spawn `claude` CLI binary) |
 
 See [Authentication](/configuration/authentication) for detailed setup instructions.
 
@@ -273,9 +280,15 @@ node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
 
 <Accordion title="Full example with all common variables">
 ```bash
-# === Claude Authentication (pick one) ===
+# === Claude Authentication ===
 ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
-# ANTHROPIC_AUTH_TOKEN=sk-ant-oat01-your-oauth-token
+
+# === OpenAI Authentication (optional) ===
+# OPENAI_API_KEY=sk-your-key-here
+
+# === Cloud Provider Selection ===
+# AGTOS_CLOUD_PROVIDER=claude          # 'claude' (default) or 'openai'
+# AGTOS_CLAUDE_TRANSPORT=sdk           # 'sdk' (default) or 'cli'
 
 # === Claude Options ===
 CLAUDE_MODEL=claude-sonnet-4-20250514

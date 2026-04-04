@@ -27,13 +27,8 @@ No. A Claude API key enables cloud AI for complex reasoning, but agtOS works wit
 Most users get the best experience with both, but you can start with either.
 </Accordion>
 
-<Accordion title="What's the difference between API key and Max subscription?">
-Two ways to pay for Claude:
-
-- **API key** (`sk-ant-api03-...`) — pay-per-token from [console.anthropic.com](https://console.anthropic.com). You pay only for what you use.
-- **Max subscription** (`sk-ant-oat01-...`) — flat monthly rate via your Claude subscription. agtOS uses the `claude` CLI as a subprocess for auth.
-
-Both work identically in agtOS. The setup wizard auto-detects which type you have based on the token prefix.
+<Accordion title="Can I use OpenAI instead of Claude?">
+Yes. agtOS supports both Anthropic (Claude) and OpenAI as cloud providers. Set `AGTOS_CLOUD_PROVIDER=openai` and provide an `OPENAI_API_KEY` to use GPT-4o for cloud inference. Claude remains the default. See [Providers](/configuration/providers) for details.
 </Accordion>
 
 ## Installation

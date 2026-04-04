@@ -42,7 +42,7 @@ agtos start --port 8080
 On first run, the CLI checks for configuration in this order:
 1. `.env.local` in the current directory
 2. `~/.agtos/config.json`
-3. Environment variables (`ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `OPENAI_API_KEY`)
+3. Environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`)
 
 If none are found, it guides you to run `agtos setup` first.
 
@@ -76,11 +76,8 @@ The wizard performs these steps:
 1. **Node.js version check** -- requires 22+ (exits if older)
 2. **Docker check** -- optional, shows running status
 3. **Ollama check** -- optional, shows installed status
-4. **Claude authentication** -- prompts for a key or token. Auto-detects format:
-   - `sk-ant-api03-` prefix → saved as `ANTHROPIC_API_KEY` (pay-per-token)
-   - `sk-ant-oat01-` prefix → saved as `ANTHROPIC_AUTH_TOKEN` (Max subscription)
-   - Validates against the actual Anthropic API. Offers retry on failure.
-5. **OpenAI key** -- optional, validates against the OpenAI API
+4. **Anthropic API key** -- prompts for `sk-ant-api03-...` key from [console.anthropic.com](https://console.anthropic.com). Validates against the Anthropic API. Offers retry on failure. Press Enter to skip.
+5. **OpenAI API key** -- optional, prompts for `sk-...` key from [platform.openai.com](https://platform.openai.com). Validates against the OpenAI API.
 6. **Write `.env.local`** -- saves validated credentials, preserving existing non-credential settings
 7. **Summary** -- shows configuration status and next steps
 

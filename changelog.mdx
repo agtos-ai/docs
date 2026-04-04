@@ -1,0 +1,34 @@
+---
+title: "Changelog"
+description: "Notable changes to agtOS"
+---
+
+## Unreleased
+
+### Added
+
+- **OpenAI cloud provider** — GPT-4o and GPT-4o Mini available as an alternative cloud tier via `AGTOS_CLOUD_PROVIDER=openai`. Full streaming, tool calling, session management, and health checks. ([ADR-019](/architecture/decisions#adr-019))
+- **Cloud provider selection** — new `AGTOS_CLOUD_PROVIDER` env var to choose between `claude` (default) and `openai` for Tier 3 inference
+- **CLI API key validation** — `agtos setup` validates API keys against the actual provider API before saving
+- **First-run detection** — `agtos start` guides you to `agtos setup` when no configuration exists
+- **Structured startup progress** — `agtos start` shows step-by-step service initialization with status icons
+- **Doctor credential validation** — `agtos doctor` checks API key functionality, network connectivity, and reports feature degradation
+- **Onboarding mic test** — real-time audio level visualization during desktop app setup
+- **Settings credential management** — update API keys inline with validation from the Settings page
+
+### Changed
+
+- **Auth overhaul** — removed OAuth/setup token support. Authentication is now API key only for all providers. `ANTHROPIC_AUTH_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` env vars are no longer recognized.
+- **Setup wizard simplified** — single API key prompt per provider (Anthropic, then optional OpenAI). The Max subscription token flow has been removed.
+- **CLI transport restructured** — opt-in via `AGTOS_CLAUDE_TRANSPORT=cli`. Passes `ANTHROPIC_API_KEY` to the subprocess instead of OAuth tokens.
+- **Model router** — `RoutingDecision.provider` now includes `'openai'` as a valid value. Cloud routing uses the configured provider.
+- **Default speech engine** — changed from speaches to sherpa-onnx (backward-compatible env var fallback)
+
+### Fixed
+
+- Onboarding wizard not shown in Tauri desktop app on first launch
+- Uptime display showing incorrect values (was using stale module-level timestamp)
+- 503 error during first few minutes after launch (`/api/health` now bypasses initialization gate)
+- OpenAI tool calls silently dropped during streaming
+- OpenAI stream cancellation for voice barge-in
+- Various OAuth UI remnants removed from Settings page

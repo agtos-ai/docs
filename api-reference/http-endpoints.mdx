@@ -1432,10 +1432,6 @@ This endpoint is **localhost-only** — requests from non-loopback addresses ret
   API key (e.g., `sk-ant-api03-...` for Anthropic, `sk-...` for OpenAI). Max 256 chars.
 </ParamField>
 
-<ParamField body="setupToken" type="string">
-  OAuth setup token (e.g., `sk-ant-oat01-...` for Anthropic Max subscription). Max 256 chars.
-</ParamField>
-
 ```json
 {
   "provider": "provider-anthropic",
@@ -1480,10 +1476,6 @@ Validate credentials against the actual provider API without storing them. Usefu
 
 <ParamField body="apiKey" type="string">
   API key to validate. Max 256 chars.
-</ParamField>
-
-<ParamField body="setupToken" type="string">
-  OAuth token to validate. Max 256 chars.
 </ParamField>
 
 ```json

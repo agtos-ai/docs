@@ -1,9 +1,9 @@
 ---
 title: "Provider Configuration"
-description: "Configure Claude, Ollama, sherpa-onnx, speaches, and the model router"
+description: "Configure Claude, OpenAI, Ollama, sherpa-onnx, speaches, and the model router"
 ---
 
-agtOS uses a multi-provider architecture. Claude handles complex reasoning in the cloud, Ollama runs local models for fast responses and privacy, and speech processing runs either in-process via sherpa-onnx or via an external speaches server. The model router ties them together.
+agtOS uses a multi-provider architecture. Claude or OpenAI handles complex reasoning in the cloud, Ollama runs local models for fast responses and privacy, and speech processing runs either in-process via sherpa-onnx or via an external speaches server. The model router ties them together.
 
 ## Claude Provider
 
@@ -71,6 +71,47 @@ Both SDKs connect to the same MCP servers, so tools are defined once and availab
 <Tip>
 For voice interactions, Haiku 4.5 provides the best speed-to-cost ratio. The model router (below) automatically selects Haiku for simple queries and Sonnet for complex ones.
 </Tip>
+
+## OpenAI Provider
+
+OpenAI is an alternative cloud LLM provider for agtOS, available as a drop-in replacement for Claude in the model router's cloud tier ([ADR-019](/architecture/decisions#adr-019)). It uses the OpenAI Node SDK v6 with streaming support.
+
+### Model Selection
+
+| Model | ID | Best For | Input $/MTok | Output $/MTok |
+|---|---|---|---|---|
+| GPT-4o | `gpt-4o` | Complex reasoning (default) | $2.50 | $10.00 |
+| GPT-4o Mini | `gpt-4o-mini` | Speed, low cost | $0.15 | $0.60 |
+
+### Configuration
+
+```bash
+# .env.local
+
+# Enable OpenAI as the cloud provider
+AGTOS_CLOUD_PROVIDER=openai
+
+# API key from platform.openai.com
+OPENAI_API_KEY=sk-your-key-here
+
+# Model (optional, defaults to gpt-4o)
+# OPENAI_MODEL=gpt-4o
+
+# Max tokens (optional, defaults to 4096)
+# OPENAI_MAX_TOKENS=4096
+```
+
+### Features
+
+- **Streaming**: Full streaming support via `.stream()` with `finalChatCompletion()`
+- **Tool calling**: Function-based tool calls compatible with the agtOS tool registry
+- **Session management**: 30-minute TTL sessions with token tracking
+- **Barge-in**: Stream cancellation via `AbortSignal` for voice pipeline interrupts
+- **Health check**: Probes `/v1/models` endpoint when API key is configured
+
+<Note>
+When `AGTOS_CLOUD_PROVIDER=openai`, the model router sends all Tier 3 (cloud) requests to OpenAI instead of Claude. If the OpenAI provider fails to initialize, it falls back to Claude with a warning.
+</Note>
 
 ## Ollama Provider
 
@@ -243,8 +284,8 @@ Tier 1: Intent Classifier (<50ms, local)
      |
      +-- simple + tools ------> Tier 2: Ollama (stream: false)
      +-- simple + no tools ----> Tier 2: Ollama (stream: true)
-     +-- complex --------------> Tier 3: Claude Haiku (streaming)
-     +-- very complex ---------> Tier 3: Claude Sonnet (streaming)
+     +-- complex --------------> Tier 3: Cloud (Claude or OpenAI, streaming)
+     +-- very complex ---------> Tier 3: Cloud (Claude or OpenAI, streaming)
      +-- privacy sensitive ----> Tier 2: Ollama (regardless of complexity)
 ```
 
@@ -255,6 +296,9 @@ Tier 1: Intent Classifier (<50ms, local)
 
 # Use the model router as the command provider (default)
 COMMAND_PROVIDER=model-router
+
+# Cloud provider selection (claude or openai)
+AGTOS_CLOUD_PROVIDER=claude
 
 # Local model for Tier 2 execution
 OLLAMA_DEFAULT_MODEL=qwen3:4b
@@ -269,6 +313,7 @@ CLAUDE_MODEL=claude-sonnet-4-20250514
 |---|---|---|
 | `classificationEnabled` | `true` | Enable intent classification |
 | `defaultProvider` | `claude` | Fallback when classification is disabled |
+| `cloudProvider` | `claude` | Cloud tier provider: `claude` or `openai` (via `AGTOS_CLOUD_PROVIDER`) |
 | `localModel` | `qwen3:4b` | Ollama model for local execution |
 | `cloudModel` | `claude-sonnet-4-20250514` | Claude model for cloud execution |
 | `privacyMode` | `false` | When true, never sends to cloud |
@@ -352,7 +397,10 @@ These settings are also configurable at runtime via `PUT /api/settings` — see 
 
 <CardGroup cols={2}>
   <Card title="Claude (Cloud)" icon="cloud">
-    Complex reasoning, multi-step tasks, creative generation. Sonnet 4 default, Haiku 4.5 for voice speed.
+    Complex reasoning, multi-step tasks, creative generation. Sonnet 4 default, Haiku 4.5 for voice speed. Default cloud provider.
+  </Card>
+  <Card title="OpenAI (Cloud)" icon="cloud">
+    Alternative cloud provider. GPT-4o for reasoning, GPT-4o Mini for speed. Selectable via `AGTOS_CLOUD_PROVIDER=openai`.
   </Card>
   <Card title="Ollama (Local)" icon="server">
     Simple queries, privacy-sensitive requests, intent classification. Qwen3 models via local GPU.
