@@ -39,12 +39,30 @@ agtos start --port 8080
 |------|-------------|
 | `--port <number>` | Override the health/API port (default: 4102). Must be 1--65535. |
 
-On first run (no `.env.local` or `~/.agtos/config.json` found), the CLI will prompt you to run `agtos setup` first.
+On first run, the CLI checks for configuration in this order:
+1. `.env.local` in the current directory
+2. `~/.agtos/config.json`
+3. Environment variables (`ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `OPENAI_API_KEY`)
 
-The server starts three listeners:
-- Port 3000: Voice WebSocket
-- Port 4100: MCP Server (Streamable HTTP)
-- Port 4102: Health + REST API + Dashboard
+If none are found, it guides you to run `agtos setup` first.
+
+Before starting, the CLI checks for port conflicts on all three ports (3000, 4100, 4102) and reports which process holds a conflicting port. Startup progress is displayed in real-time with per-service status:
+
+```
+  ✓ Health endpoint
+  ✓ Voice pipeline
+  ✓ MCP server
+  ✓ Task scheduler
+  ✓ API routes
+
+agtOS server is running!
+  Dashboard:  http://localhost:4102
+  Health:     http://localhost:4102/health
+  Voice WS:   ws://localhost:3000/audio
+  MCP:        http://localhost:4100/mcp
+```
+
+Startup timeout: 30 seconds. The server process receives forwarded SIGINT/SIGTERM signals for graceful shutdown.
 
 ### `agtos setup`
 
@@ -55,13 +73,16 @@ agtos setup
 ```
 
 The wizard performs these steps:
-1. **Node.js version check** -- requires 22+
-2. **Docker check** -- optional, needed for Redis
-3. **Ollama check** -- optional, enables local AI routing
-4. **Claude API key prompt** -- validates `sk-ant-api03-` keys against the API
-5. **Claude OAuth token prompt** -- validates `sk-ant-oat01-` tokens
-6. **OpenAI key prompt** -- optional, for OpenAI-compatible providers
-7. **Write `.env.local`** -- saves validated credentials
+1. **Node.js version check** -- requires 22+ (exits if older)
+2. **Docker check** -- optional, shows running status
+3. **Ollama check** -- optional, shows installed status
+4. **Claude authentication** -- prompts for a key or token. Auto-detects format:
+   - `sk-ant-api03-` prefix → saved as `ANTHROPIC_API_KEY` (pay-per-token)
+   - `sk-ant-oat01-` prefix → saved as `ANTHROPIC_AUTH_TOKEN` (Max subscription)
+   - Validates against the actual Anthropic API. Offers retry on failure.
+5. **OpenAI key** -- optional, validates against the OpenAI API
+6. **Write `.env.local`** -- saves validated credentials, preserving existing non-credential settings
+7. **Summary** -- shows configuration status and next steps
 
 ### `agtos status`
 
@@ -85,16 +106,18 @@ Interactive text chat with the agtOS agent. Uses the same agent reasoning loop a
 agtos chat
 ```
 
-The chat command opens an interactive prompt that connects to `POST /api/chat` and displays responses in the terminal. Type your messages and press Enter to send.
+The chat command verifies the server is reachable, then opens an interactive prompt that connects to `POST /api/chat`. Each message has a 30-second timeout. Session continuity is automatic — the server assigns a session ID on the first message and the CLI reuses it for subsequent messages.
+
+Responses show metadata: duration, reasoning steps (if > 1), and tool calls (if any). Errors don't exit the loop — you can retry or continue chatting.
 
 **In-chat commands:**
 
 | Command | Action |
 |---------|--------|
 | `/quit` or `/exit` | Exit chat |
-| `/help` | Show help |
+| `/help` | Show available commands |
 | `/session` | Show current session ID |
-| `/new` | Start a new session |
+| `/new` | Clear session and start a new conversation |
 
 ### `agtos schedule`
 
@@ -121,8 +144,8 @@ agtos schedule create "status-check" interval "300000" system.check
 | Argument | Description |
 |----------|-------------|
 | `name` | Human-readable task name |
-| `type` | Schedule type: `cron`, `once`, `interval` |
-| `expression` | Cron expression, timestamp, or interval in ms |
+| `type` | Schedule type: `cron`, `once`, or `interval` (case-sensitive) |
+| `expression` | Cron expression (for `cron`), Unix ms timestamp (for `once`), or interval in ms (for `interval`) |
 | `topic` | Event bus topic to publish when the task fires |
 
 ### `agtos memory`
@@ -137,13 +160,13 @@ agtos memory search "last conversation about weather"
 agtos memory import
 ```
 
-The `search` subcommand queries the episodic and semantic memory system via `GET /api/memory/search`.
+The `search` subcommand queries the episodic and semantic memory system via `GET /api/memory/search`. Multi-word queries are supported — `agtos memory search foo bar baz` searches for `"foo bar baz"`. Returns up to 20 results with relevance scores.
 
-The `import` subcommand scans for memories from external AI tools and imports them into agtOS via `GET /api/memory/sources` and `POST /api/memory/import`.
+The `import` subcommand scans for available external AI tool memories and imports them. Supported sources: Claude Code, Cursor, Windsurf, Aider, and GitHub Copilot.
 
 ### `agtos task`
 
-Run a background agent task. The task is processed through the same agent reasoning loop as chat, but designed for longer-running workloads.
+Run a background agent task. The task is processed through the same agent reasoning loop as chat, but designed for longer-running workloads (60-second timeout). Multi-word topics are supported.
 
 ```bash
 agtos task "research current weather in San Francisco"
@@ -191,17 +214,32 @@ System health diagnostics. Checks all dependencies and reports pass/warn/fail st
 agtos doctor
 ```
 
-Checks performed:
-- **Node.js** -- version 22+ required
-- **Redis** -- connection test
-- **Ollama** -- reachability check
-- **sherpa-onnx models** -- download status
-- **Config file** -- existence and validity
-- **Voice port** (3000) -- availability
-- **Health endpoint** (4102) -- responsiveness
-- **MCP port** (4100) -- availability
-- **Credentials** -- validates API keys against provider APIs
-- **Network** -- basic connectivity check
+Each check reports one of three statuses: `✓` pass (green), `⚠` warn (yellow), or `✗` fail (red).
+
+**Checks performed:**
+
+| # | Check | Pass | Warn | Fail |
+|---|-------|------|------|------|
+| 1 | **Node.js** | 22+ installed | -- | Version too old |
+| 2 | **Docker** | Running | Installed but not running / not found | -- |
+| 3 | **Redis** | Reachable (with RediSearch status) | -- | Not reachable |
+| 4 | **Ollama** | Installed and running | Installed but not running / not found | -- |
+| 5 | **Speech models** | All 5 downloaded | Some downloaded | None downloaded |
+| 6 | **Anthropic credentials** | Key/token validates | Network issue | Invalid or missing |
+| 7 | **OpenAI credentials** | Key validates | Validation failed | -- (optional) |
+| 8 | **Network** | api.anthropic.com reachable | Unreachable | -- |
+| 9 | **Config file** | Found and valid JSON | Not found (uses defaults) | Invalid JSON |
+| 10 | **Health endpoint** | Responding on port 4102 | HTTP non-200 | Not running |
+| 11 | **Voice port** | Active on port 3000 | Not active | -- |
+| 12 | **MCP port** | Active on port 4100 | Not active | -- |
+
+The doctor finishes with a **feature degradation summary** showing which features are available based on the check results:
+
+- **Text chat**: Requires AI provider credentials
+- **Voice**: Requires speech models + AI provider
+- **Scheduling**: Requires Redis
+- **Memory**: Requires Redis
+- **Local AI routing**: Requires Ollama
 
 ## Environment Variables
 
