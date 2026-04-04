@@ -171,7 +171,7 @@ The default STT provider runs directly in the Node.js process via ONNX Runtime:
 
 Voice Activity Detection runs locally (in the Node.js process or on the ESP32 device) before sending audio to the STT server. This prevents transcribing silence and background noise:
 
-- **Silero VAD**: ONNX model (~2MB), classifies 30ms audio frames in <1ms
+- **Silero VAD**: ONNX model (~2MB), classifies 30ms audio frames in under 1ms
 - **ESP32 VAD**: Energy-based on-device detection for hardware clients
 - A 200ms pre-buffer is included before the VAD trigger to avoid clipping the start of speech
 

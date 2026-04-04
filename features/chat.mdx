@@ -143,8 +143,7 @@ All requests are validated using Zod schemas before processing:
 - Invalid JSON returns `400`
 - Missing or empty `text` field returns `400` with validation details
 
-```json
-// 400 Bad Request
+```json 400 Bad Request
 {
   "error": "Validation failed",
   "issues": ["Text is required"]
@@ -168,8 +167,7 @@ X-RateLimit-Remaining: 18
 
 When the limit is exceeded:
 
-```json
-// 429 Too Many Requests
+```json 429 Too Many Requests
 {
   "error": "Too many requests",
   "retryAfter": 60

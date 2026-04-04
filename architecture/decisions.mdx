@@ -88,7 +88,7 @@ BYOK credential management (ADR-011) encrypts keys at rest. API security (ADR-01
 <Accordion title="ADR-004: Hybrid Model Routing">
 **Problem**: Cloud API calls cost money, add latency, and send data off-device. Local models (Qwen3.5 27B) now score competitively on function calling benchmarks. Most voice interactions are simple enough for local models.
 
-**Decision**: Three-tier routing. Tier 1: intent classification via a micro-model (< 50ms). Tier 2: local Ollama for simple requests. Tier 3: Claude for complex reasoning. Automatic fallback between tiers.
+**Decision**: Three-tier routing. Tier 1: intent classification via a micro-model (under 50ms). Tier 2: local Ollama for simple requests. Tier 3: Claude for complex reasoning. Automatic fallback between tiers.
 
 **Trade-off**: Routing complexity is higher than a single API call. Misclassification degrades experience. But cost savings are substantial for high-volume voice interactions.
 </Accordion>

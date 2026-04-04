@@ -21,8 +21,7 @@ agtOS reads configuration from environment variables, with optional file-based c
 
 Environment variables set in `.env.local` or `.env` override the JSON config file. The JSON file is useful for Docker deployments and server configurations where you want a single config file.
 
-```json
-// /etc/agtos/config.json (example)
+```json /etc/agtos/config.json
 {
   "REDIS_URL": "redis://redis:6379",
   "VOICE_PORT": "3000",
