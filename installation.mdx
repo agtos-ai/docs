@@ -1,34 +1,68 @@
 ---
 title: "Installation"
-description: "Detailed installation guide for all platforms and methods"
+description: "Install agtOS on any platform — desktop app, CLI, or Docker"
 ---
 
-## Requirements
+## Desktop App (recommended)
+
+The easiest way to run agtOS. The desktop app bundles everything — no Node.js, no terminal, no manual configuration.
+
+Download from [GitHub Releases](https://github.com/agtos-ai/agtos/releases):
+
+| Platform | Format | Architecture |
+|----------|--------|-------------|
+| **macOS** | `.dmg` | Apple Silicon (arm64) + Intel (x86\_64) |
+| **Windows** | `.msi` | x86\_64 |
+| **Linux** | `.AppImage`, `.deb` | x86\_64 |
+
+After installation, launch the app and follow the onboarding wizard. It guides you through API key setup, voice model downloads, and microphone configuration — all from a visual interface.
+
+<Info>
+The desktop app includes a bundled Node.js backend compiled as a Single Executable Application. You don't need to install Node.js, Redis, or any other dependency separately.
+</Info>
+
+### What's included
+
+- **System tray** with health indicator (green/yellow/red)
+- **Global push-to-talk** hotkey (default: `Alt+Space`) — works from any application
+- **Auto-start** on system login (optional)
+- **Auto-update** from GitHub releases
+- **Native notifications** for health changes and task completions
+
+See [Desktop App](/features/desktop) for full details.
+
+---
+
+## CLI (for developers)
+
+For developers who want source access, customization, and terminal-based workflows.
+
+### Requirements
 
 | Component | Version | Required | What it enables |
 |-----------|---------|----------|-----------------|
 | **Node.js** | 22+ | Yes | Core runtime |
-| **Docker** | Latest | No | Convenient Redis and service management |
-| **Redis** | 7.2+ with RediSearch | No | Memory, scheduling, devices, user preferences |
-| **Ollama** | Latest | No | Local AI routing, intent classification, embeddings |
+| **Docker** | Latest | No | Convenient Redis management |
+| **Redis** | 7.2+ with RediSearch | No | Memory, scheduling, devices, preferences |
+| **Ollama** | Latest | No | Local AI routing, embeddings, intent classification |
 
-## Install methods
+### Install methods
 
 <Tabs>
-  <Tab title="npm (development)">
+  <Tab title="From source">
     ```bash
     git clone https://github.com/agtos-ai/agtos.git
     cd agtos
     npm install
+    npx agtos setup    # Interactive configuration wizard
+    npx agtos start    # Start the server
     ```
-
-    Then run `npx agtos setup` for interactive configuration.
   </Tab>
-  <Tab title="CLI (global)">
+  <Tab title="Global CLI">
     ```bash
     npm install -g agtos
-    agtos setup    # Interactive configuration
-    agtos start    # Start the server
+    agtos setup
+    agtos start
     ```
   </Tab>
   <Tab title="Docker">
@@ -38,24 +72,19 @@ description: "Detailed installation guide for all platforms and methods"
     docker compose up -d
     ```
 
-    This starts agtOS, Redis, and speaches (STT/TTS fallback server) together. For GPU-accelerated speech processing:
-
-    ```bash
-    docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
-    ```
-  </Tab>
-  <Tab title="Desktop App">
-    Download the native app from [GitHub Releases](https://github.com/agtos-ai/agtos/releases):
-
-    | Platform | Format | Architecture |
-    |----------|--------|-------------|
-    | macOS | `.dmg` | Apple Silicon + Intel |
-    | Linux | `.AppImage`, `.deb` | x86\_64 |
-    | Windows | `.msi` | x86\_64 |
-
-    The desktop app bundles the agtOS backend — no Node.js required.
+    This starts agtOS, Redis, and speaches (STT/TTS fallback) together. See [Docker Deployment](/guides/docker) for details including GPU acceleration.
   </Tab>
 </Tabs>
+
+### Verify installation
+
+```bash
+npx agtos doctor
+```
+
+Runs 12 diagnostic checks (Node.js, Docker, Redis, Ollama, speech models, credentials, network, ports) and reports pass/warn/fail with remediation hints.
+
+---
 
 ## Ports
 
@@ -63,30 +92,15 @@ description: "Detailed installation guide for all platforms and methods"
 |------|---------|----------|
 | 3000 | Voice pipeline | WebSocket (`/audio`), WebRTC signaling (`/webrtc`) |
 | 4100 | MCP server | HTTP (`POST /mcp`) |
-| 4102 | Health, REST API, dashboard, metrics | HTTP |
+| 4102 | Health, REST API, dashboard, Prometheus metrics | HTTP |
 
-All ports are configurable via `VOICE_PORT`, `MCP_PORT`, and `HEALTH_PORT`.
-
-## Verify installation
-
-```bash
-npx agtos doctor
-```
-
-The doctor command runs 12 diagnostic checks and reports pass/warn/fail for each:
-
-- Node.js version, Docker, Redis, Ollama, speech models
-- API credentials (validated against actual provider APIs)
-- Network connectivity, config file, port availability
-- Feature degradation summary
-
-See [Troubleshooting](/guides/troubleshooting) if anything fails.
+All configurable via `VOICE_PORT`, `MCP_PORT`, and `HEALTH_PORT`.
 
 ## What's next?
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Step-by-step guide from install to first chat.
+    Step-by-step guide from install to first conversation.
   </Card>
   <Card title="Authentication" icon="key" href="/configuration/authentication">
     Set up Claude API key or Max subscription.

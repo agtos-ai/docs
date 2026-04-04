@@ -24,7 +24,7 @@
         "groups": [
           {
             "group": "Getting Started",
-            "pages": ["introduction", "quickstart", "installation"]
+            "pages": ["introduction", "quickstart", "installation", "use-cases"]
           },
           {
             "group": "Configuration",
@@ -37,7 +37,11 @@
           {
             "group": "Guides",
             "pages": [
-              "guides/troubleshooting"
+              "guides/docker",
+              "guides/security",
+              "guides/logging",
+              "guides/troubleshooting",
+              "guides/faq"
             ]
           }
         ]
