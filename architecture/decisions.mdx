@@ -30,7 +30,7 @@ ADRs are **immutable once accepted**. If a decision is reversed or significantly
 | 008 | Native Audio Protocol Support | Accepted | 2026-03-22 | Supports three voice modes: CASCADE (STT->LLM->TTS), HALF_CASCADE (Ultravox), NATIVE (Gemini/GPT-4o Realtime). |
 | 009 | Dynamic Toolset Loading | Accepted | 2026-03-22 | Intent-to-category mapping with top-N tool selection. Fixes MCP's context window problem (72% consumed by tool schemas). |
 | 010 | STT Provider Architecture | Accepted | 2026-03-22 | speaches server for STT via OpenAI-compatible API. Batch + streaming transcription with Faster Whisper models. |
-| 011 | BYOK Credential Management | Accepted | 2026-03-22 | AES-256-GCM encrypted credential storage. Per-provider validation. API key authentication. |
+| 011 | BYOK Credential Management | Accepted | 2026-03-22 | AES-256-GCM encrypted credential storage with scrypt KDF and AAD binding. Per-provider validation. Setup token endpoint auth. Prometheus metrics. |
 | 012 | WebSocket Audio Transport | Accepted | 2026-03-24 | WebSocket for MVP audio transport. Simpler than WebRTC, sufficient for same-network and Tailscale/VPN usage. |
 | 013 | Web Dashboard Framework | Accepted | 2026-03-28 | React 19 + Vite 6 for the management UI. Accessibility-first (WCAG AA), responsive, keyboard navigable. |
 | 014 | API Security | Accepted | 2026-03-28 | Opt-in Bearer token auth, token bucket rate limiting, Zod input validation on all POST endpoints. |
@@ -66,7 +66,7 @@ New capabilities are added as optional extensions to existing interfaces. Platfo
 
 ### Security by Default
 
-BYOK credential management (ADR-011) encrypts keys at rest. API security (ADR-014) uses timing-safe comparison and token bucket rate limiting. Device authentication uses per-device SHA-256 tokens. These are not bolt-on features -- they were designed into the architecture from the start.
+BYOK credential management (ADR-011) encrypts keys at rest with AES-256-GCM, scrypt key derivation, and AAD-bound ciphertext. Credential operations are instrumented with Prometheus metrics and structured correlation IDs. API security (ADR-014) uses timing-safe comparison and token bucket rate limiting. Device authentication uses per-device SHA-256 tokens. These are not bolt-on features -- they were designed into the architecture from the start.
 
 ## ADR Deep Dives
 

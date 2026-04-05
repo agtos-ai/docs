@@ -171,7 +171,7 @@ Here is the complete flow for a voice interaction using the cascade pipeline:
 
 ### BYOK Credentials
 
-agtOS uses Bring Your Own Key (BYOK) credential management. API keys are encrypted at rest with AES-256-GCM and a user-provided secret. Per-provider validation ensures keys are valid before storage.
+agtOS uses Bring Your Own Key (BYOK) credential management. API keys are encrypted at rest with AES-256-GCM, scrypt key derivation (N=16384, r=8, p=1), and AAD-bound ciphertext (providerId prevents cross-provider swapping). The credential endpoint requires an API key or a time-limited setup token. Per-provider validation ensures keys are valid before storage. Prometheus gauges and counters track credential health and operations.
 
 ### API Authentication
 
